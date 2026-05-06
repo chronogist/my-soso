@@ -10,7 +10,7 @@
     "./telegram": "./src/telegram/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
