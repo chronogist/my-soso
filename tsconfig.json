@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/shared-types" },
     { "path": "packages/db" },
+    { "path": "packages/queue" },
     { "path": "apps/edge" },
     { "path": "apps/worker" }
   ]
