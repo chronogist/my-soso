@@ -33,16 +33,27 @@ export type ChannelLink = typeof channelLinks.$inferSelect;
 export type NewChannelLink = typeof channelLinks.$inferInsert;
 
 /**
- * Helper SQL emitted as part of bootstrap/migration runs.
+ * Reference SQL for RLS bootstrap. Authoritative DDL lives in the
+ * numbered migration files under `src/migrations/`. Both tables ENABLE
+ * and FORCE row-level security; both policies cover USING and WITH CHECK
+ * so an UPDATE cannot reassign a row to another tenant.
  *
- * Drizzle does not yet have stable codegen for Row-Level Security policies,
- * so we ship them as raw SQL. The API service must `SET LOCAL app.user_id`
- * per request; the policies below then enforce per-tenant isolation.
+ * The API service must `SET LOCAL app.user_id` per request; the policies
+ * below then enforce per-tenant isolation.
  */
 export const rlsBootstrapSql = sql`
+  ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE users FORCE ROW LEVEL SECURITY;
   ALTER TABLE channel_links ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE channel_links FORCE ROW LEVEL SECURITY;
+
+  DROP POLICY IF EXISTS users_self ON users;
+  CREATE POLICY users_self ON users
+    USING (id = nullif(current_setting('app.user_id', true), '')::uuid)
+    WITH CHECK (id = nullif(current_setting('app.user_id', true), '')::uuid);
 
   DROP POLICY IF EXISTS channel_links_tenant_isolation ON channel_links;
   CREATE POLICY channel_links_tenant_isolation ON channel_links
-    USING (user_id = current_setting('app.user_id', true)::uuid);
+    USING (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+    WITH CHECK (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
 `;
