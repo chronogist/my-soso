@@ -11,6 +11,7 @@ import {
   type Worker,
 } from '@my-soso/queue';
 import type { Logger } from 'pino';
+import { handleCommand } from '../commands.js';
 
 export interface InboundConsumerHandles {
   workers: Worker<InboundJob>[];
@@ -52,7 +53,9 @@ export function startInboundConsumer({
           'inbound received',
         );
 
-        const replyText = inbound.text === '/start' ? 'pong' : `echo: ${inbound.text}`;
+        const command = handleCommand(inbound);
+        // The agent replaces this fallback in a later phase.
+        const replyText = command?.text ?? `(agent reply pending) you said: ${inbound.text}`;
 
         const outbound: OutboundJob = {
           userId: inbound.userId,
