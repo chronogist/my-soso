@@ -2,6 +2,7 @@
   "name": "my-soso",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "A personal finance agent that lives in your chat app — Telegram, Discord, WhatsApp.",
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -20,6 +21,15 @@
     "format:check": "prettier --check .",
     "lint:root": "eslint .",
     "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,yaml,yml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
