@@ -1,9 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
+import { buildLoggerOptions } from './logger.js';
 
 export function buildServer(config: Config): FastifyInstance {
   const app = Fastify({
-    logger: { level: config.LOG_LEVEL },
+    logger: buildLoggerOptions(config),
     disableRequestLogging: false,
     trustProxy: true,
     bodyLimit: 1024 * 1024,

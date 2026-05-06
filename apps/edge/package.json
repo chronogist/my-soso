@@ -16,6 +16,7 @@
     "@my-soso/db": "workspace:*",
     "@my-soso/shared-types": "workspace:*",
     "fastify": "^5.7.1",
+    "pino": "^10.1.0",
     "zod": "^4.4.0"
   },
   "devDependencies": {
