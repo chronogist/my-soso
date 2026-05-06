@@ -1,8 +1,11 @@
 import { loadConfig } from './config.js';
+import { initSentry } from './sentry.js';
 import { buildServer } from './server.js';
 
 async function main() {
   const config = loadConfig();
+  initSentry(config);
+
   const app = buildServer(config);
 
   try {
