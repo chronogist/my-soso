@@ -1,5 +1,7 @@
 import {
+  acquireLock,
   allInboundQueueNames,
+  conversationLockKey,
   createQueue,
   createWorker,
   InboundJobSchema,
@@ -20,12 +22,24 @@ export interface InboundConsumerHandles {
 }
 
 /**
- * Spawn one BullMQ Worker per inbound partition. Each consumes jobs in
- * FIFO order within its partition, giving per-conversation ordering
- * because same-conversation jobs always hash to the same partition.
+ * Per-conversation lock TTL. Long enough to outlast normal processing
+ * (LLM calls, DB writes), short enough that a crashed worker doesn't
+ * block the conversation forever.
+ */
+const CONVERSATION_LOCK_TTL_MS = 30_000;
+
+/**
+ * Spawn one BullMQ Worker per inbound partition with `concurrency: 1`.
  *
- * For now the reply is hardcoded ("pong" + echo). Subsequent commits
- * will replace this with the real Agent (LLM + tools).
+ * Per-conversation ordering is guaranteed by two layers:
+ *   1. Hash partitioning routes same-conversation jobs to the same queue.
+ *   2. A Redis lock keyed on conversationId serialises processing across
+ *      multiple Worker pods (concurrency:1 alone is not enough — separate
+ *      replicas could each pull a different same-conversation job).
+ *
+ * If the lock can't be acquired, the job is thrown back to the queue and
+ * retried with backoff — another worker is already handling that
+ * conversation, so we yield.
  */
 export function startInboundConsumer({
   connection,
@@ -41,32 +55,51 @@ export function startInboundConsumer({
     createWorker<InboundJob, void>({
       name,
       connection,
+      concurrency: 1,
       processor: async (job) => {
         const parsed = InboundJobSchema.safeParse(job.data);
         if (!parsed.success) {
+          // Throw so BullMQ retries; truly poisoned jobs land in DLQ.
           log.error({ jobId: job.id, issues: parsed.error.issues }, 'invalid inbound job');
-          return;
+          throw new Error('invalid inbound job payload');
         }
         const inbound = parsed.data;
-        log.info(
-          { jobId: job.id, conversationId: inbound.conversationId, channel: inbound.channel },
-          'inbound received',
-        );
 
-        const command = handleCommand(inbound);
-        // The agent replaces this fallback in a later phase.
-        const replyText = command?.text ?? `(agent reply pending) you said: ${inbound.text}`;
+        const lock = await acquireLock(connection, {
+          key: conversationLockKey(inbound.conversationId),
+          ttlMs: CONVERSATION_LOCK_TTL_MS,
+        });
+        if (!lock) {
+          log.info(
+            { jobId: job.id, conversationId: inbound.conversationId },
+            'conversation locked elsewhere, retrying',
+          );
+          throw new Error('conversation_locked');
+        }
 
-        const outbound: OutboundJob = {
-          userId: inbound.userId,
-          channel: inbound.channel,
-          externalUserId: inbound.externalUserId,
-          conversationId: inbound.conversationId,
-          text: replyText,
-          idempotencyKey: `reply:${inbound.idempotencyKey}`,
-        };
+        try {
+          log.info(
+            { jobId: job.id, conversationId: inbound.conversationId, channel: inbound.channel },
+            'inbound received',
+          );
 
-        await outboundQueue.add('outbound', outbound, { jobId: outbound.idempotencyKey });
+          const command = handleCommand(inbound);
+          // The agent replaces this fallback in a later phase.
+          const replyText = command?.text ?? `(agent reply pending) you said: ${inbound.text}`;
+
+          const outbound: OutboundJob = {
+            userId: inbound.userId,
+            channel: inbound.channel,
+            externalUserId: inbound.externalUserId,
+            conversationId: inbound.conversationId,
+            text: replyText,
+            idempotencyKey: `reply:${inbound.idempotencyKey}`,
+          };
+
+          await outboundQueue.add('outbound', outbound, { jobId: outbound.idempotencyKey });
+        } finally {
+          await lock.release();
+        }
       },
     }),
   );
