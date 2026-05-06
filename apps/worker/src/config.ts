@@ -5,6 +5,8 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().default('development'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

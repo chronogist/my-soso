@@ -78,6 +78,9 @@ importers:
       '@my-soso/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@sentry/node':
+        specifier: ^10.51.0
+        version: 10.51.0
       pino:
         specifier: ^10.1.0
         version: 10.3.1

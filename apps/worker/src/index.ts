@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js';
 import { buildLogger } from './logger.js';
+import { initSentry } from './sentry.js';
 
 interface Shutdownable {
   close: () => Promise<void>;
@@ -7,8 +8,9 @@ interface Shutdownable {
 
 function main() {
   const config = loadConfig();
-  const log = buildLogger(config);
+  initSentry(config);
 
+  const log = buildLogger(config);
   log.info('worker started');
 
   // Consumers will register themselves here in subsequent commits.
@@ -24,7 +26,6 @@ function main() {
     process.once(signal, () => void shutdown(signal));
   }
 
-  // Keep the event loop alive until a shutdown signal arrives.
   process.stdin.resume();
 }
 
