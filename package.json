@@ -15,9 +15,18 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules .turbo"
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:root": "eslint ."
   },
   "devDependencies": {
-    "turbo": "^2.9.9"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
+    "turbo": "^2.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.2"
   }
 }
