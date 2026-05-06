@@ -78,9 +78,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@my-soso/channels':
+        specifier: workspace:*
+        version: link:../../packages/channels
       '@my-soso/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@my-soso/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       '@my-soso/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

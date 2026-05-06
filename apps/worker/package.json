@@ -13,7 +13,9 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@my-soso/channels": "workspace:*",
     "@my-soso/db": "workspace:*",
+    "@my-soso/queue": "workspace:*",
     "@my-soso/shared-types": "workspace:*",
     "@sentry/node": "^10.51.0",
     "pino": "^10.1.0",

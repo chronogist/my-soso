@@ -6,5 +6,10 @@
     "composite": true
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../../packages/shared-types" }, { "path": "../../packages/db" }]
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/queue" },
+    { "path": "../../packages/channels" }
+  ]
 }
