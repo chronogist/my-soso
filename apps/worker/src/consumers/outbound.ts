@@ -37,8 +37,9 @@ export function startOutboundConsumer({
     processor: async (job) => {
       const parsed = OutboundJobSchema.safeParse(job.data);
       if (!parsed.success) {
+        // Throw so BullMQ retries; truly poisoned jobs land in DLQ.
         log.error({ jobId: job.id, issues: parsed.error.issues }, 'invalid outbound job');
-        return;
+        throw new Error('invalid outbound job payload');
       }
       const out = parsed.data;
 
