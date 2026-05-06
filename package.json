@@ -20,7 +20,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:root": "eslint .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev:edge": "pnpm --filter @my-soso/edge dev",
+    "dev:worker": "pnpm --filter @my-soso/worker dev",
+    "db:generate": "pnpm --filter @my-soso/db db:generate",
+    "db:migrate": "pnpm --filter @my-soso/db db:migrate",
+    "db:studio": "pnpm --filter @my-soso/db db:studio",
+    "db:push": "pnpm --filter @my-soso/db db:push"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
