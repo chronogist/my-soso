@@ -4,6 +4,7 @@
     { "path": "packages/shared-types" },
     { "path": "packages/db" },
     { "path": "packages/queue" },
+    { "path": "packages/channels" },
     { "path": "apps/edge" },
     { "path": "apps/worker" }
   ]
