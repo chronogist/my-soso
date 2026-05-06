@@ -1,6 +1,8 @@
 import { Queue, Worker, QueueEvents, type Processor, type WorkerOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
 
+export type { Queue, Worker, QueueEvents, Processor, WorkerOptions } from 'bullmq';
+
 const DEFAULT_JOB_OPTS = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 1000 },

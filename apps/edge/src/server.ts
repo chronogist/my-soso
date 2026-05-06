@@ -2,6 +2,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { buildLoggerOptions } from './logger.js';
 import { Sentry } from './sentry.js';
+import { registerTelegramWebhook } from './routes/telegram.js';
 
 export function buildServer(config: Config): FastifyInstance {
   const app = Fastify({
@@ -21,6 +22,8 @@ export function buildServer(config: Config): FastifyInstance {
   });
 
   app.get('/healthz', () => ({ ok: true, service: 'edge', env: config.NODE_ENV }));
+
+  registerTelegramWebhook(app, config);
 
   return app;
 }

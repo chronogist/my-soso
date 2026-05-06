@@ -8,6 +8,7 @@ const ConfigSchema = z.object({
   REDIS_URL: z.string().url(),
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(1),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
