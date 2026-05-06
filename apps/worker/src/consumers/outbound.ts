@@ -44,11 +44,12 @@ export function startOutboundConsumer({
 
       switch (out.channel) {
         case 'telegram': {
+          const buttons = out.buttons?.map((b) => ({ id: b.id, label: b.label }));
           const result = await telegram.sendTelegramMessage({
             botToken: telegramBotToken,
             chatId: out.conversationId,
             text: out.text,
-            buttons: out.buttons?.map((b) => ({ id: b.id, label: b.label })),
+            ...(buttons && buttons.length > 0 ? { buttons } : {}),
           });
           if (!result.ok) {
             log.error({ jobId: job.id, description: result.description }, 'telegram send failed');

@@ -48,5 +48,6 @@ export async function sendTelegramMessage(
   if (!json.ok) {
     return { ok: false, description: json.description ?? `HTTP ${res.status}` };
   }
-  return { ok: true, message_id: json.result?.message_id };
+  const messageId = json.result?.message_id;
+  return messageId === undefined ? { ok: true } : { ok: true, message_id: messageId };
 }
