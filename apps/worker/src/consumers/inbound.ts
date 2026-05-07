@@ -15,8 +15,10 @@ import {
   type Worker,
 } from '@my-soso/queue';
 import type { Logger } from 'pino';
+import type { Database } from '@my-soso/db';
 import { handleCommand } from '../commands.js';
 import type { Agent } from '../agent/agent.js';
+import { writeAuditEntry } from '../agent/audit.js';
 import { withSentry } from '../sentry.js';
 
 export interface InboundConsumerHandles {
@@ -58,10 +60,14 @@ export function startInboundConsumer({
   connection,
   log,
   agent,
+  db,
+  agentModelId,
 }: {
   connection: Redis;
   log: Logger;
   agent: Agent;
+  db: Database;
+  agentModelId: string;
 }): InboundConsumerHandles {
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
   const queueNames = allInboundQueueNames();
@@ -131,6 +137,7 @@ export function startInboundConsumer({
                   userId: inbound.userId,
                 });
                 replyText = result.text;
+                await writeAuditEntry({ db, log, inbound, modelId: agentModelId, result });
               } catch (err) {
                 // Agent failures must not block the FIFO sequence. Reply with
                 // an honest apology and advance the seqNo so the next user
@@ -145,6 +152,13 @@ export function startInboundConsumer({
                 );
                 replyText =
                   "I'm having trouble reaching my data right now. Please try again in a moment.";
+                await writeAuditEntry({
+                  db,
+                  log,
+                  inbound,
+                  modelId: agentModelId,
+                  errorMessage: err instanceof Error ? err.message : String(err),
+                });
               }
             }
 

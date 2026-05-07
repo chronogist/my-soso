@@ -25,7 +25,13 @@ function main() {
 
   const stack = buildAgentStack({ config, redis: connection, log });
 
-  const inbound = startInboundConsumer({ connection, log, agent: stack.agent });
+  const inbound = startInboundConsumer({
+    connection,
+    log,
+    agent: stack.agent,
+    db: stack.db,
+    agentModelId: config.ANTHROPIC_MODEL,
+  });
   const outbound = startOutboundConsumer({
     connection,
     log,
