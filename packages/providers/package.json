@@ -14,7 +14,9 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@my-soso/db": "workspace:*",
     "@my-soso/queue": "workspace:*",
+    "drizzle-orm": "^0.45.0",
     "zod": "^4.4.0"
   }
 }

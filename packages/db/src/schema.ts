@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -60,6 +69,21 @@ export const watchlistItems = pgTable(
     uniqueIndex('watchlist_items_user_symbol_idx').on(t.userId, t.assetSymbol),
   ],
 );
+
+export const providerUsageBudgets = pgTable(
+  'provider_usage_budgets',
+  {
+    provider: text('provider').notNull(),
+    periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
+    callsUsed: bigint('calls_used', { mode: 'number' }).notNull().default(0),
+    callsLimit: bigint('calls_limit', { mode: 'number' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.periodStart] })],
+);
+
+export type ProviderUsageBudget = typeof providerUsageBudgets.$inferSelect;
+export type NewProviderUsageBudget = typeof providerUsageBudgets.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

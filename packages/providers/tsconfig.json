@@ -6,5 +6,5 @@
     "composite": true
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../queue" }, { "path": "../shared-types" }]
+  "references": [{ "path": "../queue" }, { "path": "../shared-types" }, { "path": "../db" }]
 }
