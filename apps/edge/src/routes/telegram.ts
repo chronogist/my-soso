@@ -1,25 +1,50 @@
 import { telegram } from '@my-soso/channels';
+import { createDb, schema, withServiceContext } from '@my-soso/db';
 import {
   createConnection,
   createQueue,
   inboundQueueFor,
   nextConversationSeq,
   type InboundJob,
+  QueueNames,
+  type OutboundJob,
   type Queue,
 } from '@my-soso/queue';
+import { eq, and } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { Config } from '../config.js';
 
 /**
- * Pre-link placeholder userId. Real user resolution via the
- * `channel_links` table is wired in Phase 2 (auth + linking).
+ * Pre-link placeholder is deliberately gone in Phase 2. Unlinked users get
+ * a link prompt instead of entering the agent path anonymously.
  */
-const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000000';
-
 const inboundQueueCache = new Map<string, Queue<InboundJob>>();
+
+const LinkCodePayloadSchema = z.object({
+  userId: z.string().uuid(),
+  channel: z.enum(['telegram', 'discord', 'whatsapp']),
+  createdAt: z.string(),
+});
+
+function parseLinkCommand(text: string): string | null {
+  const match = /^\/link(?:@\w+)?\s+([A-Z0-9]{6})$/i.exec(text.trim());
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function parseLinkPayload(raw: string | null) {
+  if (!raw) return null;
+  try {
+    return LinkCodePayloadSchema.safeParse(JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
+}
 
 export function registerTelegramWebhook(app: FastifyInstance, config: Config): void {
   const connection = createConnection({ url: config.REDIS_URL });
+  const db = createDb({ url: config.DATABASE_URL, max: 3 });
+  const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
 
   const getQueue = (name: string): Queue<InboundJob> => {
     let q = inboundQueueCache.get(name);
@@ -32,8 +57,36 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
 
   app.addHook('onClose', async () => {
     await Promise.all([...inboundQueueCache.values()].map((q) => q.close()));
+    await outboundQueue.close();
     await connection.quit();
   });
+
+  const enqueueTelegramReply = async ({
+    userId,
+    externalUserId,
+    conversationId,
+    text,
+    idempotencyKey,
+  }: {
+    userId: string;
+    externalUserId: string;
+    conversationId: string;
+    text: string;
+    idempotencyKey: string;
+  }) => {
+    await outboundQueue.add(
+      'outbound',
+      {
+        userId,
+        channel: 'telegram',
+        externalUserId,
+        conversationId,
+        text,
+        idempotencyKey,
+      },
+      { jobId: idempotencyKey },
+    );
+  };
 
   app.post('/webhooks/telegram', async (req, reply) => {
     const secret = req.headers[telegram.TELEGRAM_SECRET_HEADER];
@@ -64,7 +117,86 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
     }
 
     const conversationId = String(message.chat.id);
+    const externalUserId = String(message.from.id);
     const idempotencyKey = `telegram:${parsed.data.update_id}`;
+    const linkCode = parseLinkCommand(message.text);
+
+    if (linkCode) {
+      const raw = await connection.get(`link_code:${linkCode}`);
+      const linkPayload = parseLinkPayload(raw);
+
+      if (!linkPayload?.success || linkPayload.data.channel !== 'telegram') {
+        await enqueueTelegramReply({
+          userId: '00000000-0000-0000-0000-000000000000',
+          externalUserId,
+          conversationId,
+          text: 'That link code is expired or invalid. Open the My-Soso dashboard and generate a fresh Telegram code.',
+          idempotencyKey: `link-failed:${idempotencyKey}`,
+        });
+        return reply.status(200).send({ ok: true });
+      }
+
+      try {
+        await withServiceContext(db, async (tx) => {
+          await tx
+            .insert(schema.channelLinks)
+            .values({
+              userId: linkPayload.data.userId,
+              channel: 'telegram',
+              channelUserId: externalUserId,
+            })
+            .onConflictDoUpdate({
+              target: [schema.channelLinks.userId, schema.channelLinks.channel],
+              set: { channelUserId: externalUserId },
+            });
+        });
+      } catch (err) {
+        req.log.warn({ err }, 'telegram link failed');
+        await enqueueTelegramReply({
+          userId: linkPayload.data.userId,
+          externalUserId,
+          conversationId,
+          text: 'I could not link this Telegram account. It may already be connected to another My-Soso account.',
+          idempotencyKey: `link-conflict:${idempotencyKey}`,
+        });
+        return reply.status(200).send({ ok: true });
+      }
+      await connection.del(`link_code:${linkCode}`);
+
+      await enqueueTelegramReply({
+        userId: linkPayload.data.userId,
+        externalUserId,
+        conversationId,
+        text: 'Telegram is linked. Your My-Soso agent now knows this chat belongs to you.',
+        idempotencyKey: `link-ok:${idempotencyKey}`,
+      });
+      req.log.info({ userId: linkPayload.data.userId }, 'telegram account linked');
+      return reply.status(200).send({ ok: true });
+    }
+
+    const [channelLink] = await withServiceContext(db, async (tx) =>
+      tx
+        .select()
+        .from(schema.channelLinks)
+        .where(
+          and(
+            eq(schema.channelLinks.channel, 'telegram'),
+            eq(schema.channelLinks.channelUserId, externalUserId),
+          ),
+        )
+        .limit(1),
+    );
+
+    if (!channelLink) {
+      await enqueueTelegramReply({
+        userId: '00000000-0000-0000-0000-000000000000',
+        externalUserId,
+        conversationId,
+        text: 'I am ready, but this Telegram chat is not linked yet. Sign in to the My-Soso dashboard, generate a Telegram code, then send /link CODE here.',
+        idempotencyKey: `unlinked:${idempotencyKey}`,
+      });
+      return reply.status(200).send({ ok: true });
+    }
 
     // Atomic INCR per conversation. Two Edge replicas posting concurrently
     // for the same chat get distinct, ordered seqNos with no coordination.
@@ -72,9 +204,9 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
     const seqNo = await nextConversationSeq(connection, conversationId);
 
     const job: InboundJob = {
-      userId: ANONYMOUS_USER_ID,
+      userId: channelLink.userId,
       channel: 'telegram',
-      externalUserId: String(message.from.id),
+      externalUserId,
       conversationId,
       text: message.text,
       idempotencyKey,

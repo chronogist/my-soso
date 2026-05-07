@@ -18,6 +18,7 @@
     "@my-soso/queue": "workspace:*",
     "@my-soso/shared-types": "workspace:*",
     "@sentry/node": "^10.51.0",
+    "drizzle-orm": "^0.45.0",
     "fastify": "^5.7.1",
     "pino": "^10.1.0",
     "zod": "^4.4.0"
