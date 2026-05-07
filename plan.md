@@ -18,13 +18,13 @@ Crypto holders and active traders who already live in Telegram, Discord, or What
 
 ## Where we are
 
-Wave 1 is split into 5 phases. Phase 1 (the spine) is complete. Phase 2 is next.
+Wave 1 is split into 5 phases. Phases 1 and 2 are complete. Phase 3 is next.
 
 | Phase | What | State |
 |---|---|---|
 | 1 | Foundation: monorepo, DB+RLS, queue, Edge, Worker, Telegram round-trip | ✅ done |
-| 2 | Privy auth + channel linking + real user resolution | ⏭ next |
-| 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | — |
+| 2 | Privy auth + channel linking + real user resolution | ✅ done |
+| 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | ⏭ next |
 | 4 | Watchlists + alert engine + news filter + digest | — |
 | 5 | Discord + WhatsApp adapters + compliance classifier + demo polish | — |
 
@@ -47,13 +47,13 @@ Wave 1 is split into 5 phases. Phase 1 (the spine) is complete. Phase 2 is next.
 - [x] `.env.example` covering all Wave 1 keys
 
 ### Auth + linking (Phase 2)
-- [ ] Web dashboard scaffold (Next.js 15 + App Router) on Railway
-- [ ] Privy login (email + auto-provisioned embedded wallet)
-- [ ] API service (Fastify) verifying Privy JWT against JWKS
-- [ ] User upsert keyed on `privy_user_id` (with `SET LOCAL app.user_id` so RLS passes)
-- [ ] Dashboard channel-link flow (generate code → user DMs `/link <code>` → write `channel_links`)
-- [ ] Edge resolves real `userId` from `channel_links` (replace anonymous placeholder)
-- [ ] Watchlist UI on dashboard (CRUD)
+- [x] Web dashboard scaffold (Next.js 15 + App Router) on Railway
+- [x] Privy login (email + auto-provisioned embedded wallet)
+- [x] API service (Fastify) verifying Privy JWT against Privy verification key
+- [x] User upsert keyed on `privy_user_id` (with explicit service context + tenant RLS)
+- [x] Dashboard channel-link flow (generate code → user DMs `/link <code>` → write `channel_links`)
+- [x] Edge resolves real `userId` from `channel_links` (replace anonymous placeholder)
+- [x] Watchlist UI on dashboard (CRUD)
 
 ### SoSoValue agent (Phase 3)
 - [ ] `MarketDataProvider` + `NewsProvider` interfaces in `@my-soso/providers`
@@ -121,4 +121,4 @@ Wave 1 is split into 5 phases. Phase 1 (the spine) is complete. Phase 2 is next.
 4. `pnpm dev:edge` and `pnpm dev:worker` in two terminals.
 5. Expose Edge via ngrok and register the Telegram webhook with your `TELEGRAM_WEBHOOK_SECRET`.
 6. `/start` in Telegram → "Welcome to My-Soso..." — round-trip working.
-7. Phase 2 begins: scaffold `apps/dashboard` (Next.js) and `apps/api` (Fastify) and wire Privy login.
+7. Phase 3 begins: build `@my-soso/providers`, SoSoValue cache/budgeting, and the first real agent tools.

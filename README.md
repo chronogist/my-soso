@@ -128,8 +128,8 @@ Full feature checklists live in [`plan.md`](plan.md).
 
 ## Status
 
-**Wave 1 / Phase 1 (foundation) complete.** The full Edge → queue → Worker → Telegram round-trip is wired; `/start` and `/help` round-trip through the spine. Per-conversation FIFO is guaranteed by a sequence-guard + Redis lock + concurrency-1 layer cake. Tenant isolation runs through `FORCE ROW LEVEL SECURITY` on every user-scoped Postgres table.
+**Wave 1 / Phases 1–2 complete.** The full Edge → queue → Worker → Telegram round-trip is wired; Privy login is scaffolded; the dashboard can generate Telegram link codes; `/link CODE` writes `channel_links`; and normal Telegram messages now resolve to a real `userId` before entering the agent path.
 
-Phase 2 (Privy auth + channel linking + real user resolution) is next. Full progress lives in [`plan.md`](plan.md), which is the resume point.
+Phase 3 (SoSoValue provider + cache + prefetcher + LLM agent) is next. Full progress lives in [`plan.md`](plan.md), which is the resume point.
 
 Read [`architecture.md`](architecture.md) before writing code. Update it before changing something it describes.

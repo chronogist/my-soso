@@ -68,5 +68,11 @@ export default tseslint.config(
     files: ['**/*.config.{js,ts,mjs}'],
     ...tseslint.configs.disableTypeChecked,
   },
+  {
+    files: ['**/next-env.d.ts'],
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off',
+    },
+  },
   prettier,
 );
