@@ -453,7 +453,7 @@ There are **no per-user bot tokens.** We run one Telegram bot, one Discord app, 
 | Hosting | **Railway** (all four services) |
 | Observability | Sentry |
 
-**Eight integrations, no more:** Neon, Upstash, Railway, Privy, SoSoValue, Telegram, Discord, WhatsApp, Anthropic, Sentry. (Plus the libraries above; those run inside our services.)
+**Ten integrations total**, grouped: infrastructure (Neon, Upstash, Railway), auth + custody (Privy), data source (SoSoValue), chat surfaces (Telegram, Discord, WhatsApp), AI (Anthropic), observability (Sentry). Libraries above run inside our services and don't count.
 
 ---
 

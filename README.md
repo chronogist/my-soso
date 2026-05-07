@@ -128,6 +128,8 @@ Full feature checklists live in [`plan.md`](plan.md).
 
 ## Status
 
-Pre-build. Architecture and ADRs complete. Building begins on green light.
+**Phase 1 (foundation) complete.** The full Edge → queue → Worker → Telegram round-trip is wired and `/start` answers via the spine. Per-conversation ordering is enforced via hash-partitioned BullMQ queues plus a Redis lock; tenant isolation runs through `FORCE ROW LEVEL SECURITY` on Postgres.
+
+Phases 2 → 5 of Wave 1 (Privy auth + linking, SoSoValue agent, Discord + WhatsApp adapters, alerts + compliance) are next.
 
 Read [`architecture.md`](architecture.md) before writing code. Update it before changing something it describes.
