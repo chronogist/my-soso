@@ -168,6 +168,12 @@ export function startInboundConsumer({
               externalUserId: inbound.externalUserId,
               conversationId: inbound.conversationId,
               text: replyText,
+              ...(inbound.discordApplicationId
+                ? { discordApplicationId: inbound.discordApplicationId }
+                : {}),
+              ...(inbound.discordInteractionToken
+                ? { discordInteractionToken: inbound.discordInteractionToken }
+                : {}),
               idempotencyKey: `reply:${inbound.idempotencyKey}`,
             };
 

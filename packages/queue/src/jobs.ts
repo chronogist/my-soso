@@ -12,6 +12,8 @@ export const InboundJobSchema = z.object({
   externalUserId: z.string().min(1),
   conversationId: z.string().min(1),
   text: z.string(),
+  discordApplicationId: z.string().min(1).optional(),
+  discordInteractionToken: z.string().min(1).optional(),
   /** Inbound message ID from the platform — also the BullMQ job ID. */
   idempotencyKey: z.string().min(1),
   /**
@@ -37,6 +39,8 @@ export const OutboundJobSchema = z.object({
   externalUserId: z.string().min(1),
   conversationId: z.string().min(1),
   text: z.string(),
+  discordApplicationId: z.string().min(1).optional(),
+  discordInteractionToken: z.string().min(1).optional(),
   buttons: z
     .array(
       z.object({

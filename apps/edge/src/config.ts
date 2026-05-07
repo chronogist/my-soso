@@ -9,6 +9,7 @@ const ConfigSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1),
+  DISCORD_PUBLIC_KEY: z.string().min(1).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

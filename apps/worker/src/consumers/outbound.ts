@@ -1,4 +1,4 @@
-import { telegram } from '@my-soso/channels';
+import { discord, telegram } from '@my-soso/channels';
 import {
   createWorker,
   OutboundJobSchema,
@@ -62,6 +62,23 @@ export function startOutboundConsumer({
             return;
           }
           case 'discord':
+            if (!out.discordApplicationId || !out.discordInteractionToken) {
+              log.error({ jobId: job.id }, 'discord outbound missing interaction metadata');
+              throw new Error('discord outbound missing interaction metadata');
+            }
+            {
+              const result = await discord.sendDiscordFollowupMessage({
+                applicationId: out.discordApplicationId,
+                interactionToken: out.discordInteractionToken,
+                text: out.text,
+              });
+              if (!result.ok) {
+                log.error({ jobId: job.id, description: result.description }, 'discord send failed');
+                throw new Error(result.description);
+              }
+              log.info({ jobId: job.id }, 'discord send ok');
+              return;
+            }
           case 'whatsapp':
             log.warn({ channel: out.channel }, 'channel adapter not yet implemented');
             return;

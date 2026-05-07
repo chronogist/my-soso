@@ -2,6 +2,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { buildLoggerOptions } from './logger.js';
 import { Sentry } from './sentry.js';
+import { registerDiscordWebhook } from './routes/discord.js';
 import { registerTelegramWebhook } from './routes/telegram.js';
 
 export function buildServer(config: Config): FastifyInstance {
@@ -10,6 +11,10 @@ export function buildServer(config: Config): FastifyInstance {
     disableRequestLogging: false,
     trustProxy: true,
     bodyLimit: 1024 * 1024,
+  });
+
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
   });
 
   app.setErrorHandler((err: FastifyError, req, reply) => {
@@ -24,6 +29,7 @@ export function buildServer(config: Config): FastifyInstance {
   app.get('/healthz', () => ({ ok: true, service: 'edge', env: config.NODE_ENV }));
 
   registerTelegramWebhook(app, config);
+  registerDiscordWebhook(app, config);
 
   return app;
 }

@@ -10,7 +10,6 @@ import {
   type OutboundJob,
   type Queue,
 } from '@my-soso/queue';
-import { eq, and } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Config } from '../config.js';
@@ -98,7 +97,18 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
       return reply.status(401).send({ error: 'unauthorized' });
     }
 
-    const parsed = telegram.TelegramUpdateSchema.safeParse(req.body);
+    const rawBody =
+      typeof req.body === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(req.body) as unknown;
+            } catch {
+              return null;
+            }
+          })()
+        : req.body;
+
+    const parsed = telegram.TelegramUpdateSchema.safeParse(rawBody);
     if (!parsed.success) {
       req.log.warn({ issues: parsed.error.issues }, 'telegram update parse failed');
       return reply.status(400).send({ error: 'invalid payload' });
@@ -179,17 +189,11 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
       return reply.status(200).send({ ok: true });
     }
 
-    const [channelLink] = await withServiceContext(db, async (tx) =>
-      tx
-        .select()
-        .from(schema.channelLinks)
-        .where(
-          and(
-            eq(schema.channelLinks.channel, 'telegram'),
-            eq(schema.channelLinks.channelUserId, externalUserId),
-          ),
-        )
-        .limit(1),
+    const channelLink = await withServiceContext(db, async (tx) =>
+      tx.query.channelLinks.findFirst({
+        where: (channelLinks, { and, eq }) =>
+          and(eq(channelLinks.channel, 'telegram'), eq(channelLinks.channelUserId, externalUserId)),
+      }),
     );
 
     if (!channelLink) {
