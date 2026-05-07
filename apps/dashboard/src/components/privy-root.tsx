@@ -18,10 +18,12 @@ export function PrivyRoot({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['email'],
+        loginMethods: ['email', 'wallet'],
         appearance: {
           theme: 'light',
           accentColor: '#14532d',
+          showWalletLoginFirst: false,
+          walletChainType: 'ethereum-only',
         },
         embeddedWallets: {
           ethereum: {
