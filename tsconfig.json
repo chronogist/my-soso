@@ -5,6 +5,7 @@
     { "path": "packages/db" },
     { "path": "packages/queue" },
     { "path": "packages/channels" },
+    { "path": "packages/providers" },
     { "path": "apps/api" },
     { "path": "apps/dashboard" },
     { "path": "apps/edge" },

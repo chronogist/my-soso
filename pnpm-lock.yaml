@@ -188,6 +188,12 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  packages/providers:
+    dependencies:
+      zod:
+        specifier: ^4.4.0
+        version: 4.4.3
+
   packages/queue:
     dependencies:
       '@my-soso/shared-types':
