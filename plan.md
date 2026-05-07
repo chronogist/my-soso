@@ -18,14 +18,14 @@ Crypto holders and active traders who already live in Telegram, Discord, or What
 
 ## Where we are
 
-Wave 1 is split into 5 phases. Phases 1 and 2 are complete. Phase 3 is next.
+Wave 1 is split into 5 phases. Phases 1, 2, and 3 are complete. Phase 4 is next.
 
 | Phase | What | State |
 |---|---|---|
 | 1 | Foundation: monorepo, DB+RLS, queue, Edge, Worker, Telegram round-trip | ✅ done |
 | 2 | Privy auth + channel linking + real user resolution | ✅ done |
-| 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | ⏭ next |
-| 4 | Watchlists + alert engine + news filter + digest | — |
+| 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | ✅ done |
+| 4 | Watchlists + alert engine + news filter + digest | ⏭ next |
 | 5 | Discord + WhatsApp adapters + compliance classifier + demo polish | — |
 
 ---
@@ -55,16 +55,16 @@ Wave 1 is split into 5 phases. Phases 1 and 2 are complete. Phase 3 is next.
 - [x] Edge resolves real `userId` from `channel_links` (replace anonymous placeholder)
 - [x] Watchlist UI on dashboard (CRUD)
 
-### SoSoValue agent (Phase 3)
-- [ ] `MarketDataProvider` + `NewsProvider` interfaces in `@my-soso/providers`
-- [ ] SoSoValue implementation (cached) with `x-soso-api-key` auth
-- [ ] Prefetcher singleton (BullMQ repeatable job) — top currencies/news/indices/ETF
-- [ ] Monthly budget tracker (`provider_usage_budgets` table)
-- [ ] Per-minute SoSoValue token bucket (6/min)
-- [ ] Anthropic Claude wired into Worker via Vercel AI SDK
-- [ ] First two tools: `getPrice`, `getNewsForAsset`
-- [ ] Replace echo fallback in inbound consumer with real agent
-- [ ] Cache hit rate metric
+### SoSoValue agent (Phase 3) — done
+- [x] `MarketDataProvider` + `NewsProvider` interfaces in `@my-soso/providers`
+- [x] SoSoValue implementation (cached) with `x-soso-api-key` auth
+- [x] Prefetcher singleton (BullMQ repeatable job) — top currencies/news/indices/ETF
+- [x] Monthly budget tracker (`provider_usage_budgets` table)
+- [x] Per-minute SoSoValue token bucket (6/min)
+- [x] Anthropic Claude wired into Worker via Vercel AI SDK
+- [x] First two tools: `getPrice`, `getNewsForAsset`
+- [x] Replace echo fallback in inbound consumer with real agent
+- [x] Cache hit rate metric
 
 ### Tools, watchlists, alerts (Phase 4)
 - [ ] Remaining tools: `getETFFlow`, `getIndex`, `listIndices`, watchlist CRUD, alert CRUD, `generateMemo`

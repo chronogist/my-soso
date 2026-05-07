@@ -16,9 +16,9 @@ const ConfigSchema = z.object({
   SOSOVALUE_BASE_URL: z.string().url().optional(),
   /** Per-minute call cap for SoSoValue. Demo plan documents 10 rpm; we leave
    * headroom by defaulting to 6 rpm. */
-  SOSOVALUE_RPM: z.coerce.number().int().positive().default(6),
+  SOSOVALUE_RPM_BUDGET: z.coerce.number().int().positive().default(6),
   /** Monthly call budget for SoSoValue. Demo plan documents ~10k/month. */
-  SOSOVALUE_MONTHLY_LIMIT: z.coerce.number().int().positive().default(10_000),
+  SOSOVALUE_MONTHLY_BUDGET: z.coerce.number().int().positive().default(10_000),
 
   /** Comma-separated list of symbols the prefetcher keeps warm. */
   PREFETCH_SYMBOLS: z

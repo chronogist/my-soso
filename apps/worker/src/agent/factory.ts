@@ -54,7 +54,7 @@ export function buildAgentStack({
 
   const rateLimit = createTokenBucket(redis, {
     name: 'sosovalue:rpm',
-    refillRate: config.SOSOVALUE_RPM,
+    refillRate: config.SOSOVALUE_RPM_BUDGET,
     refillIntervalMs: 60_000,
   });
 
@@ -65,7 +65,7 @@ export function buildAgentStack({
   const budget = createPgBudgetTracker({
     db,
     provider: 'sosovalue',
-    monthlyLimit: config.SOSOVALUE_MONTHLY_LIMIT,
+    monthlyLimit: config.SOSOVALUE_MONTHLY_BUDGET,
   });
 
   const inner = new SoSoValueProvider({
