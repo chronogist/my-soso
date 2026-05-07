@@ -45,6 +45,23 @@ export async function withTenantUser<T>(
   });
 }
 
+/**
+ * Run a narrowly scoped internal operation that needs to cross tenant
+ * boundaries, such as resolving an inbound Telegram user to our `user_id`
+ * or upserting a user after Privy verifies their JWT. Keep this out of
+ * request handlers unless the operation genuinely cannot start with a
+ * known tenant id.
+ */
+export async function withServiceContext<T>(
+  db: Database,
+  fn: (tx: Parameters<Parameters<Database['transaction']>[0]>[0]) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL app.service_context = 'true'`);
+    return fn(tx);
+  });
+}
+
 /** Cheap connectivity probe for liveness/readiness checks. */
 export async function healthCheck(
   db: Database,

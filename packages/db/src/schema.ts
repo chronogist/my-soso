@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -27,10 +27,48 @@ export const channelLinks = pgTable(
   ],
 );
 
+export const watchlists = pgTable(
+  'watchlists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    isDefault: boolean('is_default').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('watchlists_user_name_idx').on(t.userId, t.name)],
+);
+
+export const watchlistItems = pgTable(
+  'watchlist_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    watchlistId: uuid('watchlist_id')
+      .notNull()
+      .references(() => watchlists.id, { onDelete: 'cascade' }),
+    assetSymbol: text('asset_symbol').notNull(),
+    assetKind: text('asset_kind').notNull().default('crypto'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('watchlist_items_watchlist_symbol_idx').on(t.watchlistId, t.assetSymbol),
+    uniqueIndex('watchlist_items_user_symbol_idx').on(t.userId, t.assetSymbol),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type ChannelLink = typeof channelLinks.$inferSelect;
 export type NewChannelLink = typeof channelLinks.$inferInsert;
+export type Watchlist = typeof watchlists.$inferSelect;
+export type NewWatchlist = typeof watchlists.$inferInsert;
+export type WatchlistItem = typeof watchlistItems.$inferSelect;
+export type NewWatchlistItem = typeof watchlistItems.$inferInsert;
 
 /**
  * Reference SQL for RLS bootstrap. Authoritative DDL lives in the
@@ -44,16 +82,42 @@ export type NewChannelLink = typeof channelLinks.$inferInsert;
 export const rlsBootstrapSql = sql`
   ALTER TABLE users ENABLE ROW LEVEL SECURITY;
   ALTER TABLE users FORCE ROW LEVEL SECURITY;
-  ALTER TABLE channel_links ENABLE ROW LEVEL SECURITY;
-  ALTER TABLE channel_links FORCE ROW LEVEL SECURITY;
+	  ALTER TABLE channel_links ENABLE ROW LEVEL SECURITY;
+	  ALTER TABLE channel_links FORCE ROW LEVEL SECURITY;
+	  ALTER TABLE watchlists ENABLE ROW LEVEL SECURITY;
+	  ALTER TABLE watchlists FORCE ROW LEVEL SECURITY;
+	  ALTER TABLE watchlist_items ENABLE ROW LEVEL SECURITY;
+	  ALTER TABLE watchlist_items FORCE ROW LEVEL SECURITY;
 
-  DROP POLICY IF EXISTS users_self ON users;
-  CREATE POLICY users_self ON users
-    USING (id = nullif(current_setting('app.user_id', true), '')::uuid)
-    WITH CHECK (id = nullif(current_setting('app.user_id', true), '')::uuid);
+	  DROP POLICY IF EXISTS users_self ON users;
+	  CREATE POLICY users_self ON users
+	    USING (
+	      nullif(current_setting('app.service_context', true), '') = 'true'
+	      OR id = nullif(current_setting('app.user_id', true), '')::uuid
+	    )
+	    WITH CHECK (
+	      nullif(current_setting('app.service_context', true), '') = 'true'
+	      OR id = nullif(current_setting('app.user_id', true), '')::uuid
+	    );
 
-  DROP POLICY IF EXISTS channel_links_tenant_isolation ON channel_links;
-  CREATE POLICY channel_links_tenant_isolation ON channel_links
-    USING (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
-    WITH CHECK (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
-`;
+	  DROP POLICY IF EXISTS channel_links_tenant_isolation ON channel_links;
+	  CREATE POLICY channel_links_tenant_isolation ON channel_links
+	    USING (
+	      nullif(current_setting('app.service_context', true), '') = 'true'
+	      OR user_id = nullif(current_setting('app.user_id', true), '')::uuid
+	    )
+	    WITH CHECK (
+	      nullif(current_setting('app.service_context', true), '') = 'true'
+	      OR user_id = nullif(current_setting('app.user_id', true), '')::uuid
+	    );
+
+	  DROP POLICY IF EXISTS watchlists_tenant_isolation ON watchlists;
+	  CREATE POLICY watchlists_tenant_isolation ON watchlists
+	    USING (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+	    WITH CHECK (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
+
+	  DROP POLICY IF EXISTS watchlist_items_tenant_isolation ON watchlist_items;
+	  CREATE POLICY watchlist_items_tenant_isolation ON watchlist_items
+	    USING (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+	    WITH CHECK (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
+	`;
