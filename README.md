@@ -68,7 +68,7 @@ Lean by design. Eight integrations, no ceremony.
 | **Anthropic Claude** | The LLM behind the agent (tool-calling) |
 | **Privy** | Auth + email login + embedded wallet (also our Wave 3 signing layer) |
 | **Telegram, Discord, WhatsApp** | Three channels, one shared agent |
-| **Postgres on Neon** | User data; Row-Level Security for tenant isolation |
+| **Postgres on Supabase** | User data; Row-Level Security for tenant isolation |
 | **Upstash Redis + BullMQ** | Job queue + warmed cache + rate-limit counters |
 | **Railway** | Hosts all four services + dashboard |
 | **Sentry** | Errors and basic performance |

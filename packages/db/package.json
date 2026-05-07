@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "clean": "rm -rf dist .turbo *.tsbuildinfo",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/apply-migrations.js",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push"
   },
@@ -23,6 +23,8 @@
     "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.10"
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
+    "pg": "^8.20.0"
   }
 }

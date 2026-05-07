@@ -95,7 +95,7 @@ The hardest constraint we design around: **SoSoValue's API allows 10 requests/mi
                                                             │
                                                             ▼
                                               ┌──────────────────────────┐
-                                              │  POSTGRES (Neon)         │
+                                              │  POSTGRES (Supabase)     │
                                               │  RLS by user_id          │
                                               └──────────────────────────┘
 ```
@@ -409,7 +409,7 @@ There are **no per-user bot tokens.** We run one Telegram bot, one Discord app, 
 | SoSoValue API key | Railway env var | Worker only |
 | Anthropic API key | Railway env var | Worker only |
 | Privy app secret | Railway env var | API + Worker |
-| Postgres URL (Neon) | Railway env var (auto-injected) | API + Worker |
+| Postgres URL (Supabase) | Railway env var | API + Worker |
 | Redis URL (Upstash) | Railway env var (auto-injected) | All services |
 | User wallet addresses | Postgres plaintext | (public on-chain) |
 | Channel link IDs | Postgres plaintext | (just identifiers) |
@@ -442,7 +442,7 @@ There are **no per-user bot tokens.** We run one Telegram bot, one Discord app, 
 | Monorepo | pnpm workspaces + Turborepo |
 | API | Fastify |
 | Dashboard | Next.js 15 (App Router) |
-| Database | Postgres on **Neon** |
+| Database | Postgres on **Supabase** |
 | ORM | Drizzle |
 | Queue + Cache | **Upstash Redis** + BullMQ (one instance, `noeviction`) |
 | Auth + Wallet | **Privy** |
@@ -453,7 +453,7 @@ There are **no per-user bot tokens.** We run one Telegram bot, one Discord app, 
 | Hosting | **Railway** (all four services) |
 | Observability | Sentry |
 
-**Ten integrations total**, grouped: infrastructure (Neon, Upstash, Railway), auth + custody (Privy), data source (SoSoValue), chat surfaces (Telegram, Discord, WhatsApp), AI (Anthropic), observability (Sentry). Libraries above run inside our services and don't count.
+**Ten integrations total**, grouped: infrastructure (Supabase, Upstash, Railway), auth + custody (Privy), data source (SoSoValue), chat surfaces (Telegram, Discord, WhatsApp), AI (Anthropic), observability (Sentry). Libraries above run inside our services and don't count.
 
 ---
 

@@ -117,8 +117,8 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 ## How to resume
 
 1. `pnpm install`
-2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, plus Sentry optional.
-3. `pnpm db:migrate` to apply `0000_initial.sql` and `0001_rls_hardening.sql` to Neon.
+2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, plus Sentry optional.
+3. `pnpm db:migrate` to apply the SQL migrations to Supabase.
 4. `pnpm dev:edge` and `pnpm dev:worker` in two terminals.
 5. Expose Edge via ngrok and register the Telegram webhook with your `TELEGRAM_WEBHOOK_SECRET`.
 6. `/start` in Telegram → "Welcome to My-Soso..." — round-trip working.

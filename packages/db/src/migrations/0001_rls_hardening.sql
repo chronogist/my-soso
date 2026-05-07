@@ -14,8 +14,8 @@
 -- │ This migration fixes all three.                                          │
 -- └──────────────────────────────────────────────────────────────────────────┘
 
--- gen_random_uuid() lives in pgcrypto on Postgres. Neon ships with it
--- preinstalled but the explicit CREATE EXTENSION is idempotent and safe.
+-- gen_random_uuid() lives in pgcrypto on Postgres. The explicit
+-- CREATE EXTENSION is idempotent and safe on Supabase.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ─── users ────────────────────────────────────────────────────────────────
