@@ -4,6 +4,7 @@ import { startInboundConsumer } from './consumers/inbound.js';
 import { startOutboundConsumer } from './consumers/outbound.js';
 import { startPrefetcher } from './consumers/prefetcher.js';
 import { buildAgentStack } from './agent/factory.js';
+import { startMetricsReporter } from './agent/metrics.js';
 import { buildLogger } from './logger.js';
 import { initSentry } from './sentry.js';
 
@@ -30,6 +31,13 @@ function main() {
   });
 
   const consumers: Shutdownable[] = [inbound, outbound, stack];
+
+  const metrics = startMetricsReporter({
+    log,
+    cacheCounters: stack.cacheCounters,
+    budget: stack.budget,
+  });
+  consumers.push(metrics);
 
   if (config.PREFETCH_ENABLED && config.PREFETCH_SYMBOLS.length > 0) {
     const prefetcher = startPrefetcher({

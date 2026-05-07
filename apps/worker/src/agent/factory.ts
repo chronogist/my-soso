@@ -3,6 +3,7 @@ import {
   createPgBudgetTracker,
   createRedisProviderCache,
   SoSoValueProvider,
+  type BudgetTracker,
   type MarketDataProvider,
   type NewsProvider,
 } from '@my-soso/providers';
@@ -18,6 +19,8 @@ export interface AgentStack {
   provider: MarketDataProvider & NewsProvider;
   /** Cache hit-rate counters; periodically logged for observability. */
   cacheCounters: { hits: number; misses: number; errors: number };
+  /** Monthly budget tracker; reused by the metrics reporter. */
+  budget: BudgetTracker;
   close: () => Promise<void>;
 }
 
@@ -89,6 +92,7 @@ export function buildAgentStack({
     agent,
     provider,
     cacheCounters: counters,
+    budget,
     close: async () => {
       await db.$client.end({ timeout: 5 });
     },
