@@ -8,7 +8,7 @@ import {
   type NewsProvider,
 } from '@my-soso/providers';
 import { createTokenBucket, type Redis } from '@my-soso/queue';
-import { createDb } from '@my-soso/db';
+import { createDb, type Database } from '@my-soso/db';
 import type { Logger } from 'pino';
 import type { Config } from '../config.js';
 import { createAgent, type Agent } from './agent.js';
@@ -24,6 +24,8 @@ export interface AgentStack {
   budget: BudgetTracker;
   /** News extractor; consumed by the prefetcher and (later) the alert engine. */
   newsExtractor: NewsExtractor;
+  /** Database handle exposed so the alert engine can read alerts and write deliveries. */
+  db: Database;
   close: () => Promise<void>;
 }
 
@@ -105,6 +107,7 @@ export function buildAgentStack({
     cacheCounters: counters,
     budget,
     newsExtractor,
+    db,
     close: async () => {
       await db.$client.end({ timeout: 5 });
     },

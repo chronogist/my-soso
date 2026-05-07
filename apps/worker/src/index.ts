@@ -2,6 +2,7 @@ import { createConnection } from '@my-soso/queue';
 import { loadConfig } from './config.js';
 import { startInboundConsumer } from './consumers/inbound.js';
 import { startOutboundConsumer } from './consumers/outbound.js';
+import { startAlertEngine } from './consumers/alert-engine.js';
 import { startPrefetcher } from './consumers/prefetcher.js';
 import { buildAgentStack } from './agent/factory.js';
 import { startMetricsReporter } from './agent/metrics.js';
@@ -49,6 +50,19 @@ function main() {
       intervalMs: config.PREFETCH_INTERVAL_MS,
     });
     consumers.push(prefetcher);
+  }
+
+  if (config.ALERT_ENGINE_ENABLED) {
+    const alerts = startAlertEngine({
+      connection,
+      log,
+      db: stack.db,
+      market: stack.provider,
+      intervalMs: config.ALERT_ENGINE_INTERVAL_MS,
+      cooldownMs: config.ALERT_COOLDOWN_MS,
+      newsLookbackMs: config.ALERT_NEWS_LOOKBACK_MS,
+    });
+    consumers.push(alerts);
   }
 
   log.info('worker ready');

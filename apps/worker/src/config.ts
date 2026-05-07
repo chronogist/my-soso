@@ -37,6 +37,23 @@ const ConfigSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+
+  /** Alert engine: tick cadence, cooldown between fires of the same alert, news lookback. */
+  ALERT_ENGINE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  ALERT_ENGINE_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  ALERT_COOLDOWN_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60_000),
+  ALERT_NEWS_LOOKBACK_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(6 * 60 * 60_000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
