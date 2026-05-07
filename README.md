@@ -128,8 +128,8 @@ Full feature checklists live in [`plan.md`](plan.md).
 
 ## Status
 
-**Phase 1 (foundation) complete.** The full Edge → queue → Worker → Telegram round-trip is wired and `/start` answers via the spine. Per-conversation ordering is enforced via hash-partitioned BullMQ queues plus a Redis lock; tenant isolation runs through `FORCE ROW LEVEL SECURITY` on Postgres.
+**Wave 1 / Phase 1 (foundation) complete.** The full Edge → queue → Worker → Telegram round-trip is wired; `/start` and `/help` round-trip through the spine. Per-conversation FIFO is guaranteed by a sequence-guard + Redis lock + concurrency-1 layer cake. Tenant isolation runs through `FORCE ROW LEVEL SECURITY` on every user-scoped Postgres table.
 
-Phases 2 → 5 of Wave 1 (Privy auth + linking, SoSoValue agent, Discord + WhatsApp adapters, alerts + compliance) are next.
+Phase 2 (Privy auth + channel linking + real user resolution) is next. Full progress lives in [`plan.md`](plan.md), which is the resume point.
 
 Read [`architecture.md`](architecture.md) before writing code. Update it before changing something it describes.
