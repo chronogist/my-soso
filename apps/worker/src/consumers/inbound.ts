@@ -1,10 +1,12 @@
 import {
   acquireLock,
+  advanceProcessedSeq,
   allInboundQueueNames,
   conversationLockKey,
   createQueue,
   createWorker,
   InboundJobSchema,
+  lastProcessedSeq,
   QueueNames,
   type InboundJob,
   type OutboundJob,
@@ -32,15 +34,24 @@ const CONVERSATION_LOCK_TTL_MS = 30_000;
 /**
  * Spawn one BullMQ Worker per inbound partition with `concurrency: 1`.
  *
- * Per-conversation ordering is guaranteed by two layers:
- *   1. Hash partitioning routes same-conversation jobs to the same queue.
- *   2. A Redis lock keyed on conversationId serialises processing across
- *      multiple Worker pods (concurrency:1 alone is not enough — separate
- *      replicas could each pull a different same-conversation job).
+ * Per-conversation FIFO is guaranteed by **two** mechanisms working
+ * together:
  *
- * If the lock can't be acquired, the job is thrown back to the queue and
- * retried with backoff — another worker is already handling that
- * conversation, so we yield.
+ *   1. **Sequence guard** — Edge stamps each inbound message with a
+ *      strictly monotonic per-conversation seqNo. The Worker only
+ *      processes when `job.seqNo == lastProcessed + 1`; otherwise it
+ *      throws and the job is requeued with backoff. This makes ordering
+ *      independent of retry timing, lock TTL expiry, or replica count.
+ *
+ *   2. **Conversation lock** — mutual exclusion guard for the rare
+ *      case where two replicas race on the same seqNo (e.g. a job that
+ *      was redelivered after worker death). The lock is non-essential
+ *      for correctness given the seq guard but cheap and worth keeping.
+ *
+ * The lock TTL can in theory expire mid-LLM-call. If that happens, the
+ * sequence guard still prevents another worker from processing
+ * out-of-order — they'd see `lastProcessed` is unchanged and refuse the
+ * next seqNo until ours completes (which advances it).
  */
 export function startInboundConsumer({
   connection,
@@ -61,12 +72,27 @@ export function startInboundConsumer({
         withSentry('inbound', async () => {
           const parsed = InboundJobSchema.safeParse(job.data);
           if (!parsed.success) {
-            // Throw so BullMQ retries; truly poisoned jobs land in DLQ.
             log.error({ jobId: job.id, issues: parsed.error.issues }, 'invalid inbound job');
             throw new Error('invalid inbound job payload');
           }
           const inbound = parsed.data;
 
+          // ─── Sequence guard ────────────────────────────────────────
+          const lastSeq = await lastProcessedSeq(connection, inbound.conversationId);
+          if (inbound.seqNo !== lastSeq + 1) {
+            log.info(
+              {
+                jobId: job.id,
+                conversationId: inbound.conversationId,
+                seqNo: inbound.seqNo,
+                lastSeq,
+              },
+              'out of order, will retry',
+            );
+            throw new Error(`out_of_order: have ${inbound.seqNo}, expected ${lastSeq + 1}`);
+          }
+
+          // ─── Mutual exclusion lock (defense-in-depth) ──────────────
           const lock = await acquireLock(connection, {
             key: conversationLockKey(inbound.conversationId),
             ttlMs: CONVERSATION_LOCK_TTL_MS,
@@ -81,7 +107,12 @@ export function startInboundConsumer({
 
           try {
             log.info(
-              { jobId: job.id, conversationId: inbound.conversationId, channel: inbound.channel },
+              {
+                jobId: job.id,
+                conversationId: inbound.conversationId,
+                channel: inbound.channel,
+                seqNo: inbound.seqNo,
+              },
               'inbound received',
             );
 
@@ -99,6 +130,19 @@ export function startInboundConsumer({
             };
 
             await outboundQueue.add('outbound', outbound, { jobId: outbound.idempotencyKey });
+
+            // Advance the processed counter ATOMICALLY only if it's still
+            // exactly `lastSeq + 1`. If a parallel worker somehow advanced
+            // it (shouldn't be possible given the lock, but defense in
+            // depth), we throw rather than corrupt the counter.
+            const advanced = await advanceProcessedSeq(
+              connection,
+              inbound.conversationId,
+              inbound.seqNo,
+            );
+            if (!advanced) {
+              throw new Error('processed_seq_drift');
+            }
           } finally {
             await lock.release();
           }

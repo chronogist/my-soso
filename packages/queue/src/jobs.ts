@@ -14,6 +14,13 @@ export const InboundJobSchema = z.object({
   text: z.string(),
   /** Inbound message ID from the platform — also the BullMQ job ID. */
   idempotencyKey: z.string().min(1),
+  /**
+   * Strictly monotonic per-conversation sequence number stamped at
+   * enqueue time. The Worker only processes the job whose `seqNo`
+   * equals `lastProcessedSeq + 1` for that conversation, guaranteeing
+   * FIFO regardless of retry timing across pods.
+   */
+  seqNo: z.number().int().positive(),
   receivedAt: z.coerce.date(),
 });
 export type InboundJob = z.infer<typeof InboundJobSchema>;

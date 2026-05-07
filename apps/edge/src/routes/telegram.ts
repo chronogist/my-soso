@@ -3,6 +3,7 @@ import {
   createConnection,
   createQueue,
   inboundQueueFor,
+  nextConversationSeq,
   type InboundJob,
   type Queue,
 } from '@my-soso/queue';
@@ -65,6 +66,11 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
     const conversationId = String(message.chat.id);
     const idempotencyKey = `telegram:${parsed.data.update_id}`;
 
+    // Atomic INCR per conversation. Two Edge replicas posting concurrently
+    // for the same chat get distinct, ordered seqNos with no coordination.
+    // The Worker uses this to enforce strict FIFO regardless of retry timing.
+    const seqNo = await nextConversationSeq(connection, conversationId);
+
     const job: InboundJob = {
       userId: ANONYMOUS_USER_ID,
       channel: 'telegram',
@@ -72,13 +78,14 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
       conversationId,
       text: message.text,
       idempotencyKey,
+      seqNo,
       receivedAt: new Date(),
     };
 
     const queueName = inboundQueueFor(conversationId);
     await getQueue(queueName).add('inbound', job, { jobId: idempotencyKey });
 
-    req.log.info({ queueName, conversationId, idempotencyKey }, 'telegram inbound enqueued');
+    req.log.info({ queueName, conversationId, idempotencyKey, seqNo }, 'telegram inbound enqueued');
     return reply.status(200).send({ ok: true });
   });
 }
