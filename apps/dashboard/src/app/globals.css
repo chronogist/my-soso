@@ -270,6 +270,85 @@ h2 {
   padding: 32px;
 }
 
+.topbar__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.channel-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 240px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(38, 51, 35, 0.12);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+  font: inherit;
+  color: var(--ink);
+}
+
+.channel-card:hover:not(.channel-card--disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 32px 80px rgba(38, 51, 35, 0.18);
+}
+
+.channel-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.channel-card__name {
+  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.channel-card__tagline {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.channel-card__badge {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(217, 155, 56, 0.18);
+  color: #8a5a14;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 780px) {
   .page-shell {
     width: min(100% - 24px, 1120px);
@@ -278,7 +357,8 @@ h2 {
 
   .hero-card,
   .hero-card--split,
-  .grid {
+  .grid,
+  .channel-grid {
     grid-template-columns: 1fr;
   }
 

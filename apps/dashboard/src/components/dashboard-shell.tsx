@@ -10,9 +10,44 @@ import {
   type Watchlist,
 } from '../lib/api';
 
+type Channel = 'telegram' | 'discord' | 'whatsapp';
+
 interface PrivyProfile {
   email?: { address?: string };
   wallet?: { address?: string };
+}
+
+interface ChannelOption {
+  id: Channel;
+  name: string;
+  tagline: string;
+  available: boolean;
+}
+
+const CHANNELS: ChannelOption[] = [
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    tagline: 'Live now — DM your agent in seconds.',
+    available: true,
+  },
+  { id: 'discord', name: 'Discord', tagline: 'Coming in Phase 5.', available: false },
+  { id: 'whatsapp', name: 'WhatsApp', tagline: 'Coming in Phase 5.', available: false },
+];
+
+const CHOSEN_CHANNEL_KEY = 'mysoso.chosenChannel';
+
+function readChosenChannel(): Channel | null {
+  if (typeof window === 'undefined') return null;
+  const stored = window.localStorage.getItem(CHOSEN_CHANNEL_KEY);
+  if (stored === 'telegram' || stored === 'discord' || stored === 'whatsapp') return stored;
+  return null;
+}
+
+function persistChosenChannel(channel: Channel | null) {
+  if (typeof window === 'undefined') return;
+  if (channel) window.localStorage.setItem(CHOSEN_CHANNEL_KEY, channel);
+  else window.localStorage.removeItem(CHOSEN_CHANNEL_KEY);
 }
 
 export function DashboardShell() {
@@ -24,6 +59,7 @@ export function DashboardShell() {
   const [symbol, setSymbol] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [chosenChannel, setChosenChannel] = useState<Channel | null>(null);
 
   async function token(): Promise<string> {
     const accessToken = await getAccessToken();
@@ -48,10 +84,27 @@ export function DashboardShell() {
     setApiUser(synced.user);
     setLinks(nextLinks.links);
     setWatchlist(nextWatchlist.watchlist);
+
+    // If a returning user already linked a channel, jump straight into setup
+    // for that channel and skip the picker.
+    const stored = readChosenChannel();
+    if (stored) {
+      setChosenChannel(stored);
+    } else if (nextLinks.links.length > 0) {
+      const firstLinked = nextLinks.links[0]!.channel;
+      persistChosenChannel(firstLinked);
+      setChosenChannel(firstLinked);
+    }
   }
 
   useEffect(() => {
-    if (!ready || !authenticated) return;
+    if (!ready || !authenticated) {
+      setChosenChannel(null);
+      setApiUser(null);
+      setLinks([]);
+      setWatchlist(null);
+      return;
+    }
     startTransition(() => {
       void refreshAll().catch((e) => setError(e instanceof Error ? e.message : String(e)));
     });
@@ -62,6 +115,18 @@ export function DashboardShell() {
     startTransition(() => {
       void action().catch((e) => setError(e instanceof Error ? e.message : String(e)));
     });
+  }
+
+  function pickChannel(channel: Channel) {
+    persistChosenChannel(channel);
+    setChosenChannel(channel);
+    setLinkCode(null);
+  }
+
+  function clearChannel() {
+    persistChosenChannel(null);
+    setChosenChannel(null);
+    setLinkCode(null);
   }
 
   if (!ready) {
@@ -92,16 +157,61 @@ export function DashboardShell() {
     );
   }
 
+  if (!chosenChannel) {
+    return (
+      <main className="page-shell">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Step 1 of 2</p>
+            <h1>Welcome to your personal finance hub.</h1>
+          </div>
+          <button className="ghost-button" onClick={logout}>
+            Sign out
+          </button>
+        </header>
+        <p className="lede">
+          Choose the platform you&apos;re most comfortable on. Your agent will live there.
+        </p>
+
+        {error ? <div className="error-box">{error}</div> : null}
+
+        <section className="channel-grid">
+          {CHANNELS.map((c) => (
+            <button
+              key={c.id}
+              className={`channel-card ${c.available ? '' : 'channel-card--disabled'}`}
+              onClick={() => c.available && pickChannel(c.id)}
+              disabled={!c.available}
+              aria-label={`Choose ${c.name}`}
+            >
+              <span className="channel-card__name">{c.name}</span>
+              <span className="channel-card__tagline">{c.tagline}</span>
+              {!c.available ? <span className="channel-card__badge">Coming soon</span> : null}
+            </button>
+          ))}
+        </section>
+      </main>
+    );
+  }
+
+  const channelMeta = CHANNELS.find((c) => c.id === chosenChannel)!;
+  const isLinked = links.some((l) => l.channel === chosenChannel);
+
   return (
     <main className="page-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Phase 2</p>
-          <h1>Connect your agent</h1>
+          <p className="eyebrow">Step 2 of 2 — {channelMeta.name}</p>
+          <h1>Set up your agent</h1>
         </div>
-        <button className="ghost-button" onClick={logout}>
-          Sign out
-        </button>
+        <div className="topbar__actions">
+          <button className="ghost-button" onClick={clearChannel}>
+            Change channel
+          </button>
+          <button className="ghost-button" onClick={logout}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       {error ? <div className="error-box">{error}</div> : null}
@@ -115,29 +225,34 @@ export function DashboardShell() {
         </article>
 
         <article className="panel accent-panel">
-          <p className="eyebrow">Telegram link</p>
-          <h2>Generate a 10-minute link code</h2>
+          <p className="eyebrow">{channelMeta.name} link</p>
+          <h2>
+            {isLinked ? 'Linked. You can DM your agent now.' : 'Generate a 10-minute link code'}
+          </h2>
           <p className="muted">
-            Send the command to the bot from your private Telegram chat. The bot will attach that
-            Telegram id to this signed-in account.
+            {isLinked
+              ? `${channelMeta.name} is connected to this account. Open your DM with the bot and start asking questions.`
+              : `Send the command to the bot from your private ${channelMeta.name} chat. The bot will attach that ${channelMeta.name} id to this signed-in account.`}
           </p>
-          <button
-            className="primary-button"
-            disabled={isPending}
-            onClick={() =>
-              run(async () => {
-                const accessToken = await token();
-                const next = await apiFetch<LinkCode>('/v1/link-codes', accessToken, {
-                  method: 'POST',
-                  body: JSON.stringify({ channel: 'telegram' }),
-                });
-                setLinkCode(next);
-              })
-            }
-          >
-            Generate /link code
-          </button>
-          {linkCode ? (
+          {!isLinked ? (
+            <button
+              className="primary-button"
+              disabled={isPending}
+              onClick={() =>
+                run(async () => {
+                  const accessToken = await token();
+                  const next = await apiFetch<LinkCode>('/v1/link-codes', accessToken, {
+                    method: 'POST',
+                    body: JSON.stringify({ channel: chosenChannel }),
+                  });
+                  setLinkCode(next);
+                })
+              }
+            >
+              Generate /link code
+            </button>
+          ) : null}
+          {linkCode?.channel === chosenChannel ? (
             <div className="code-card">
               <span>{linkCode.command}</span>
               <small>Expires in {Math.round(linkCode.expiresInSeconds / 60)} minutes</small>
