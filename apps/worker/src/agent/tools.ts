@@ -176,6 +176,139 @@ export function buildAgentTools({ market, news, db, userId }: ToolDeps) {
         };
       },
     }),
+
+    listAlerts: tool({
+      description:
+        "List the user's active alerts. No arguments. Returns id, name, kind, symbol, and (for price alerts) op + threshold.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const rows = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .select()
+            .from(schema.alerts)
+            .where(and(eq(schema.alerts.userId, userId), eq(schema.alerts.active, true)))
+            .orderBy(schema.alerts.createdAt),
+        );
+        return {
+          ok: true as const,
+          alerts: rows.map((a) => ({
+            id: a.id,
+            name: a.name,
+            kind: a.kind,
+            symbol: a.assetSymbol,
+            priceOp: a.priceOp,
+            priceThreshold: a.priceThreshold !== null ? Number(a.priceThreshold) : null,
+            createdAt: a.createdAt.toISOString(),
+          })),
+        };
+      },
+    }),
+
+    setPriceAlert: tool({
+      description:
+        'Create a price-threshold alert that fires when an asset crosses a level. Use op "lt" / "lte" for "drops below or to" and "gt" / "gte" for "rises above or to".',
+      inputSchema: z.object({
+        symbol: SymbolArg,
+        op: z.enum(['lt', 'lte', 'gt', 'gte']).describe('Comparison operator.'),
+        threshold: z.number().positive().describe('Price level in USD.'),
+        name: z
+          .string()
+          .min(1)
+          .max(80)
+          .optional()
+          .describe('Optional human-readable label; auto-generated if omitted.'),
+      }),
+      execute: async ({ symbol, op, threshold, name }) => {
+        const upper = symbol.toUpperCase();
+        try {
+          await market.getPrice(upper);
+        } catch (err) {
+          if (err instanceof UnknownSymbolError) {
+            return {
+              ok: false as const,
+              reason: 'unknown_symbol' as const,
+              message: `I don't recognise "${symbol}". Try the asset's standard ticker.`,
+            };
+          }
+        }
+        const friendlyOp = op === 'lt' || op === 'lte' ? 'drops below' : 'rises above';
+        const label = name ?? `${upper} ${friendlyOp} $${threshold}`;
+        const [created] = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .insert(schema.alerts)
+            .values({
+              userId,
+              name: label,
+              kind: 'price',
+              assetSymbol: upper,
+              assetKind: 'crypto',
+              priceOp: op,
+              // numeric() is stored as string in postgres-js; drizzle accepts string.
+              priceThreshold: threshold.toString(),
+              active: true,
+            })
+            .returning({ id: schema.alerts.id, name: schema.alerts.name }),
+        );
+        if (!created) {
+          return {
+            ok: false as const,
+            reason: 'unknown_error' as const,
+            message: 'Could not create the alert.',
+          };
+        }
+        return { ok: true as const, id: created.id, name: created.name };
+      },
+    }),
+
+    setNewsAlert: tool({
+      description:
+        'Create a news alert that fires when a high-severity news article tagged to the asset is published.',
+      inputSchema: z.object({
+        symbol: SymbolArg,
+        name: z.string().min(1).max(80).optional(),
+      }),
+      execute: async ({ symbol, name }) => {
+        const upper = symbol.toUpperCase();
+        const label = name ?? `${upper} breaking news`;
+        const [created] = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .insert(schema.alerts)
+            .values({
+              userId,
+              name: label,
+              kind: 'news',
+              assetSymbol: upper,
+              assetKind: 'crypto',
+              active: true,
+            })
+            .returning({ id: schema.alerts.id, name: schema.alerts.name }),
+        );
+        if (!created) {
+          return {
+            ok: false as const,
+            reason: 'unknown_error' as const,
+            message: 'Could not create the alert.',
+          };
+        }
+        return { ok: true as const, id: created.id, name: created.name };
+      },
+    }),
+
+    removeAlert: tool({
+      description: "Delete one of the user's alerts by id (UUID returned from listAlerts).",
+      inputSchema: z.object({
+        alertId: z.string().uuid().describe('Alert id from listAlerts.'),
+      }),
+      execute: async ({ alertId }) => {
+        const removed = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .delete(schema.alerts)
+            .where(and(eq(schema.alerts.userId, userId), eq(schema.alerts.id, alertId)))
+            .returning({ id: schema.alerts.id }),
+        );
+        return { ok: true as const, removed: removed.length > 0 };
+      },
+    }),
   };
 }
 
