@@ -6,8 +6,14 @@ import {
   type Redis,
   type Worker,
 } from '@my-soso/queue';
-import { RateLimitedError, type MarketDataProvider, type NewsProvider } from '@my-soso/providers';
+import {
+  RateLimitedError,
+  type MarketDataProvider,
+  type NewsItem,
+  type NewsProvider,
+} from '@my-soso/providers';
 import type { Logger } from 'pino';
+import type { NewsExtractor } from '../agent/news-extractor.js';
 import { withSentry } from '../sentry.js';
 
 /**
@@ -33,6 +39,8 @@ export interface PrefetcherOptions {
   connection: Redis;
   log: Logger;
   provider: MarketDataProvider & NewsProvider;
+  /** Optional: extract and persist news classifications after each tick. */
+  newsExtractor?: NewsExtractor;
   /** Symbols to keep warm. Default: BTC, ETH, SOL. */
   symbols?: readonly string[];
   /** Tick cadence in ms. Default 60_000 (1 min). */
@@ -86,6 +94,7 @@ export function startPrefetcher(opts: PrefetcherOptions): PrefetcherHandles {
         let priceHits = 0;
         let newsHits = 0;
         const errors: string[] = [];
+        const newsItems: NewsItem[] = [];
 
         // Sequential rather than parallel so we don't blow the
         // per-minute token bucket in a single instant.
@@ -98,11 +107,24 @@ export function startPrefetcher(opts: PrefetcherOptions): PrefetcherHandles {
             if (err instanceof RateLimitedError) break;
           }
           try {
-            await opts.provider.getNewsForAsset(symbol, { limit: newsLimit });
+            const items = await opts.provider.getNewsForAsset(symbol, { limit: newsLimit });
             newsHits++;
+            newsItems.push(...items);
           } catch (err) {
             errors.push(`news:${symbol}:${describeErr(err)}`);
             if (err instanceof RateLimitedError) break;
+          }
+        }
+
+        let extracted = 0;
+        let extractionSkipped = 0;
+        if (opts.newsExtractor && newsItems.length > 0) {
+          try {
+            const result = await opts.newsExtractor.extractMissing(newsItems);
+            extracted = result.inserted;
+            extractionSkipped = result.skipped;
+          } catch (err) {
+            errors.push(`extract:${describeErr(err)}`);
           }
         }
 
@@ -111,6 +133,9 @@ export function startPrefetcher(opts: PrefetcherOptions): PrefetcherHandles {
             symbols: symbols.length,
             priceHits,
             newsHits,
+            newsItemCount: newsItems.length,
+            extracted,
+            extractionSkipped,
             durationMs: Date.now() - startedAt,
             errorCount: errors.length,
             errorSample: errors.slice(0, 3),

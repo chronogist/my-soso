@@ -44,6 +44,7 @@ function main() {
       connection,
       log,
       provider: stack.provider,
+      newsExtractor: stack.newsExtractor,
       symbols: config.PREFETCH_SYMBOLS,
       intervalMs: config.PREFETCH_INTERVAL_MS,
     });

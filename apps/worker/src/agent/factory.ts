@@ -12,6 +12,7 @@ import { createDb } from '@my-soso/db';
 import type { Logger } from 'pino';
 import type { Config } from '../config.js';
 import { createAgent, type Agent } from './agent.js';
+import { createNewsExtractor, type NewsExtractor } from './news-extractor.js';
 
 export interface AgentStack {
   agent: Agent;
@@ -21,6 +22,8 @@ export interface AgentStack {
   cacheCounters: { hits: number; misses: number; errors: number };
   /** Monthly budget tracker; reused by the metrics reporter. */
   budget: BudgetTracker;
+  /** News extractor; consumed by the prefetcher and (later) the alert engine. */
+  newsExtractor: NewsExtractor;
   close: () => Promise<void>;
 }
 
@@ -89,11 +92,19 @@ export function buildAgentStack({
     model: config.ANTHROPIC_MODEL,
   });
 
+  const newsExtractor = createNewsExtractor({
+    db,
+    log,
+    anthropicApiKey: config.ANTHROPIC_API_KEY,
+    model: config.ANTHROPIC_MODEL,
+  });
+
   return {
     agent,
     provider,
     cacheCounters: counters,
     budget,
+    newsExtractor,
     close: async () => {
       await db.$client.end({ timeout: 5 });
     },
