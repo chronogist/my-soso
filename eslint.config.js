@@ -34,6 +34,8 @@ export default tseslint.config(
             'packages/*/*.config.js',
             'apps/*/*.config.ts',
             'apps/*/*.config.js',
+            'apps/*/scripts/*.ts',
+            'packages/*/scripts/*.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
