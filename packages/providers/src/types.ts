@@ -42,10 +42,19 @@ export type NewsItem = z.infer<typeof NewsItemSchema>;
 export const ETFFlowSchema = z.object({
   /** ETF ticker (e.g. "IBIT") or product slug if provider has no ticker. */
   symbol: z.string().min(1),
-  /** Underlying asset the ETF tracks ("BTC", "ETH", …). */
-  underlying: z.string().min(1),
+  /**
+   * Underlying asset the ETF tracks ("BTC", "ETH", …). Nullable
+   * because some providers return the flow snapshot without a join
+   * to the underlying — callers infer from context or a separate
+   * lookup.
+   */
+  underlying: z.string().min(1).nullable(),
   /** Net inflow in USD for the reported window. Negative = outflow. */
   netFlowUsd: z.number().finite(),
+  /** Cumulative inflow since launch, when the provider exposes it. */
+  cumulativeFlowUsd: z.number().finite().nullable(),
+  /** Net assets under management, when the provider exposes it. */
+  netAssetsUsd: z.number().finite().nullable(),
   asOf: z.coerce.date(),
   source: z.string().min(1),
 });

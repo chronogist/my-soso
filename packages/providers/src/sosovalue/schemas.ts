@@ -68,9 +68,44 @@ export const NewsItemSchema = z.object({
   title: z.string().nullable(),
   content: z.string().nullable().optional(),
   author: z.string().nullable().optional(),
-  matched_currencies: z.array(MatchedCurrencySchema).optional(),
+  matched_currencies: z
+    .array(MatchedCurrencySchema)
+    .nullable()
+    .optional()
+    .transform((v) => v ?? []),
 });
 export type NewsItemRaw = z.infer<typeof NewsItemSchema>;
+
+export const ETFSnapshotSchema = z.object({
+  /** Epoch ms (sometimes stringified) of the reporting window. */
+  date: intFromString,
+  ticker: z.string().min(1),
+  /** Net inflow USD (negative = outflow). */
+  net_inflow: numericFromStringNullable,
+  /** Cumulative inflow USD. */
+  cum_inflow: numericFromStringNullable,
+  /** Net assets under management USD. */
+  net_assets: numericFromStringNullable,
+});
+export type ETFSnapshot = z.infer<typeof ETFSnapshotSchema>;
+
+export const IndexListSchema = z.array(z.string().min(1));
+
+/**
+ * The /indices/{ticker}/market-snapshot envelope uses field names
+ * that start with digits ("24h_change_pct"). Zod accepts those as
+ * keys; consumers must use bracket notation when reading.
+ */
+export const IndexSnapshotSchema = z.object({
+  price: numericFromString,
+  '24h_change_pct': numericFromStringNullable,
+  '7day_roi': numericFromStringNullable.optional(),
+  '1month_roi': numericFromStringNullable.optional(),
+  '3month_roi': numericFromStringNullable.optional(),
+  '1year_roi': numericFromStringNullable.optional(),
+  ytd: numericFromStringNullable.optional(),
+});
+export type IndexSnapshot = z.infer<typeof IndexSnapshotSchema>;
 
 export const NewsListSchema = z.object({
   page: intFromString.nullable().optional(),

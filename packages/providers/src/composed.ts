@@ -124,7 +124,9 @@ export function composeProvider(opts: ComposeProviderOptions): MarketDataProvide
       ),
 
     listIndices: () =>
-      memoize<readonly Index[]>(`${ns}:indices`, ttls.indexSeconds, () => opts.inner.listIndices()),
+      memoize<readonly string[]>(`${ns}:indices`, ttls.indexSeconds, () =>
+        opts.inner.listIndices(),
+      ),
 
     getNewsForAsset: (symbol, newsOpts) => {
       const limit = newsOpts?.limit ?? 10;

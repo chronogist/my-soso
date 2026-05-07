@@ -25,5 +25,9 @@ export interface MarketDataProvider {
 
   getIndex(symbol: string): Promise<Index>;
 
-  listIndices(): Promise<readonly Index[]>;
+  /**
+   * Bare list of index ticker symbols. Detail (value, change, name)
+   * is fetched on demand via `getIndex` to keep the catalogue cheap.
+   */
+  listIndices(): Promise<readonly string[]>;
 }

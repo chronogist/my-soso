@@ -114,6 +114,34 @@ async function main(): Promise<void> {
   if (unknown) {
     console.log('  unexpected: got a price for a fake symbol');
   }
+  console.log();
+
+  const indices = await step('listIndices()', () => provider.listIndices());
+  if (indices) {
+    console.log(
+      `  got ${indices.length} indices: ${indices.slice(0, 5).join(', ')}${indices.length > 5 ? ' …' : ''}`,
+    );
+  }
+  console.log();
+
+  if (indices && indices.length > 0) {
+    const first = indices[0];
+    const idx = await step(`getIndex("${first}")`, () => provider.getIndex(first));
+    if (idx) {
+      console.log('  value:', idx.value, '  change24hPct:', idx.change24hPct);
+    }
+    console.log();
+  }
+
+  const etf = await step('getETFFlow("IBIT")  (BlackRock spot BTC ETF)', () =>
+    provider.getETFFlow('IBIT'),
+  );
+  if (etf) {
+    console.log('  netFlowUsd:', etf.netFlowUsd);
+    console.log('  cumulativeFlowUsd:', etf.cumulativeFlowUsd);
+    console.log('  netAssetsUsd:', etf.netAssetsUsd);
+    console.log('  asOf:', etf.asOf.toISOString());
+  }
 }
 
 void main();

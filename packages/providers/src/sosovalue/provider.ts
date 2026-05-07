@@ -1,7 +1,6 @@
 import type { MarketDataProvider } from '../market-data.js';
 import type { NewsProvider } from '../news.js';
 import {
-  ProviderError,
   UnknownSymbolError,
   type ETFFlow,
   type Index,
@@ -11,6 +10,9 @@ import {
 import { SoSoValueHttp, type SoSoValueHttpOptions } from './http.js';
 import {
   CurrencyListSchema,
+  ETFSnapshotSchema,
+  IndexListSchema,
+  IndexSnapshotSchema,
   MarketSnapshotSchema,
   NewsListSchema,
   type Currency,
@@ -91,25 +93,50 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
     return out;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async getETFFlow(_symbol: string): Promise<ETFFlow> {
-    throw new ProviderError('getETFFlow not implemented in Phase 3', {
-      provider: PROVIDER_NAME,
-    });
+  async getETFFlow(symbol: string): Promise<ETFFlow> {
+    const ticker = symbol.trim().toUpperCase();
+    const snap = await this.http.get(
+      `/etfs/${encodeURIComponent(ticker)}/market-snapshot`,
+      ETFSnapshotSchema,
+    );
+    return {
+      symbol: snap.ticker.toUpperCase(),
+      // SoSoValue's market-snapshot does not return the underlying
+      // asset; the agent / caller infers it from context. Phase 4
+      // alert engine never needs it.
+      underlying: null,
+      netFlowUsd: snap.net_inflow ?? 0,
+      cumulativeFlowUsd: snap.cum_inflow,
+      netAssetsUsd: snap.net_assets,
+      asOf: new Date(snap.date),
+      source: PROVIDER_NAME,
+    };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async getIndex(_symbol: string): Promise<Index> {
-    throw new ProviderError('getIndex not implemented in Phase 3', {
-      provider: PROVIDER_NAME,
-    });
+  async getIndex(symbol: string): Promise<Index> {
+    const ticker = symbol.trim();
+    const snap = await this.http.get(
+      `/indices/${encodeURIComponent(ticker)}/market-snapshot`,
+      IndexSnapshotSchema,
+    );
+    const change = snap['24h_change_pct'];
+    return {
+      symbol: ticker,
+      // SoSoValue does not return a human-readable name on this
+      // endpoint; fall back to the ticker so downstream code never
+      // needs to handle a null name.
+      name: ticker,
+      value: snap.price,
+      // Same decimal-fraction convention as currencies (-0.0185 for -1.85%).
+      change24hPct: change !== null && change !== undefined ? change * 100 : null,
+      asOf: new Date(),
+      source: PROVIDER_NAME,
+    };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async listIndices(): Promise<readonly Index[]> {
-    throw new ProviderError('listIndices not implemented in Phase 3', {
-      provider: PROVIDER_NAME,
-    });
+  async listIndices(): Promise<readonly string[]> {
+    const list = await this.http.get('/indices', IndexListSchema);
+    return list;
   }
 
   async getNewsForAsset(
