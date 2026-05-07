@@ -2,6 +2,7 @@ import { createConnection } from '@my-soso/queue';
 import { loadConfig } from './config.js';
 import { startInboundConsumer } from './consumers/inbound.js';
 import { startOutboundConsumer } from './consumers/outbound.js';
+import { buildAgentStack } from './agent/factory.js';
 import { buildLogger } from './logger.js';
 import { initSentry } from './sentry.js';
 
@@ -18,14 +19,16 @@ function main() {
 
   const connection = createConnection({ url: config.REDIS_URL });
 
-  const inbound = startInboundConsumer({ connection, log });
+  const stack = buildAgentStack({ config, redis: connection, log });
+
+  const inbound = startInboundConsumer({ connection, log, agent: stack.agent });
   const outbound = startOutboundConsumer({
     connection,
     log,
     telegramBotToken: config.TELEGRAM_BOT_TOKEN,
   });
 
-  const consumers: Shutdownable[] = [inbound, outbound];
+  const consumers: Shutdownable[] = [inbound, outbound, stack];
 
   log.info('worker ready');
 

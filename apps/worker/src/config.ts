@@ -8,6 +8,17 @@ const ConfigSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_BOT_TOKEN: z.string().min(1),
+
+  // Phase 3: SoSoValue + Anthropic agent.
+  ANTHROPIC_API_KEY: z.string().min(1),
+  ANTHROPIC_MODEL: z.string().min(1).default('claude-haiku-4-5-20251001'),
+  SOSOVALUE_API_KEY: z.string().min(1),
+  SOSOVALUE_BASE_URL: z.string().url().optional(),
+  /** Per-minute call cap for SoSoValue. Demo plan documents 10 rpm; we leave
+   * headroom by defaulting to 6 rpm. */
+  SOSOVALUE_RPM: z.coerce.number().int().positive().default(6),
+  /** Monthly call budget for SoSoValue. Demo plan documents ~10k/month. */
+  SOSOVALUE_MONTHLY_LIMIT: z.coerce.number().int().positive().default(10_000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

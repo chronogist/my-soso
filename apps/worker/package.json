@@ -13,11 +13,14 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.75",
     "@my-soso/channels": "workspace:*",
     "@my-soso/db": "workspace:*",
+    "@my-soso/providers": "workspace:*",
     "@my-soso/queue": "workspace:*",
     "@my-soso/shared-types": "workspace:*",
     "@sentry/node": "^10.51.0",
+    "ai": "^6.0.175",
     "pino": "^10.1.0",
     "zod": "^4.4.0"
   },

@@ -16,6 +16,7 @@ import {
 } from '@my-soso/queue';
 import type { Logger } from 'pino';
 import { handleCommand } from '../commands.js';
+import type { Agent } from '../agent/agent.js';
 import { withSentry } from '../sentry.js';
 
 export interface InboundConsumerHandles {
@@ -56,9 +57,11 @@ const CONVERSATION_LOCK_TTL_MS = 30_000;
 export function startInboundConsumer({
   connection,
   log,
+  agent,
 }: {
   connection: Redis;
   log: Logger;
+  agent: Agent;
 }): InboundConsumerHandles {
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
   const queueNames = allInboundQueueNames();
@@ -117,8 +120,32 @@ export function startInboundConsumer({
             );
 
             const command = handleCommand(inbound);
-            // The agent replaces this fallback in a later phase.
-            const replyText = command?.text ?? `(agent reply pending) you said: ${inbound.text}`;
+            let replyText: string;
+            if (command) {
+              replyText = command.text;
+            } else {
+              try {
+                const result = await agent.run({
+                  userMessage: inbound.text,
+                  conversationId: inbound.conversationId,
+                });
+                replyText = result.text;
+              } catch (err) {
+                // Agent failures must not block the FIFO sequence. Reply with
+                // an honest apology and advance the seqNo so the next user
+                // message can flow.
+                log.error(
+                  {
+                    err,
+                    jobId: job.id,
+                    conversationId: inbound.conversationId,
+                  },
+                  'agent run failed',
+                );
+                replyText =
+                  "I'm having trouble reaching my data right now. Please try again in a moment.";
+              }
+            }
 
             const outbound: OutboundJob = {
               userId: inbound.userId,
