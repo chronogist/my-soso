@@ -66,7 +66,10 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
       kind: 'crypto',
       quote: 'USD',
       price: snap.price,
-      change24hPct: snap.change_pct_24h,
+      // SoSoValue returns change_pct_24h as a decimal fraction
+      // (-0.0185 for -1.85%). Our `Price.change24hPct` is documented
+      // as a percent, so multiply once at the mapping boundary.
+      change24hPct: snap.change_pct_24h !== null ? snap.change_pct_24h * 100 : null,
       marketCapUsd: snap.marketcap,
       volume24hUsd: snap.turnover_24h,
       // SoSoValue's market-snapshot envelope does not currently expose
@@ -120,7 +123,13 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
       page: 1,
       page_size: pageSize,
     });
-    return list.list.slice(0, pageSize).map((n) => mapNews(n, currency));
+    return list.list
+      .filter(
+        (n): n is NewsItemRaw & { title: string } =>
+          typeof n.title === 'string' && n.title.length > 0,
+      )
+      .slice(0, pageSize)
+      .map((n) => mapNews(n, currency));
   }
 
   async getLatestNews(opts: { limit?: number } = {}): Promise<readonly NewsItem[]> {
@@ -129,7 +138,13 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
       page: 1,
       page_size: pageSize,
     });
-    return list.list.slice(0, pageSize).map((n) => mapNews(n, null));
+    return list.list
+      .filter(
+        (n): n is NewsItemRaw & { title: string } =>
+          typeof n.title === 'string' && n.title.length > 0,
+      )
+      .slice(0, pageSize)
+      .map((n) => mapNews(n, null));
   }
 
   /**
@@ -183,7 +198,7 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
   }
 }
 
-function mapNews(raw: NewsItemRaw, currency: Currency | null): NewsItem {
+function mapNews(raw: NewsItemRaw & { title: string }, currency: Currency | null): NewsItem {
   const tagged = (raw.matched_currencies ?? [])
     .map((m) => m.symbol)
     .filter((s): s is string => typeof s === 'string' && s.length > 0)

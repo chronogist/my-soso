@@ -21,6 +21,15 @@ const numericFromStringNullable = z.preprocess((v) => {
   return v;
 }, numericFromString.nullable());
 
+const intFromString = z.preprocess((v) => {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.length > 0) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.trunc(n) : v;
+  }
+  return v;
+}, z.number().int());
+
 export const CurrencySchema = z.object({
   currency_id: z.string().min(1),
   symbol: z.string().min(1),
@@ -53,9 +62,10 @@ export const NewsItemSchema = z.object({
   id: z.string().min(1),
   source_link: z.string().url().nullable().optional(),
   original_link: z.string().url().nullable().optional(),
-  /** SoSoValue reports release_time as epoch milliseconds. */
-  release_time: z.number().int(),
-  title: z.string().min(1),
+  /** SoSoValue reports release_time as epoch milliseconds, sometimes as a string. */
+  release_time: intFromString,
+  /** Some feed items have a null title; we filter them out at the mapper. */
+  title: z.string().nullable(),
   content: z.string().nullable().optional(),
   author: z.string().nullable().optional(),
   matched_currencies: z.array(MatchedCurrencySchema).optional(),
@@ -63,9 +73,9 @@ export const NewsItemSchema = z.object({
 export type NewsItemRaw = z.infer<typeof NewsItemSchema>;
 
 export const NewsListSchema = z.object({
-  page: z.number().int().nullable().optional(),
-  page_size: z.number().int().nullable().optional(),
-  total: z.number().int().nullable().optional(),
+  page: intFromString.nullable().optional(),
+  page_size: intFromString.nullable().optional(),
+  total: intFromString.nullable().optional(),
   list: z.array(NewsItemSchema),
 });
 export type NewsList = z.infer<typeof NewsListSchema>;
