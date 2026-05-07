@@ -1,5 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { and, eq } from 'drizzle-orm';
 import {
   ProviderError,
   RateLimitedError,
@@ -7,6 +8,8 @@ import {
   type MarketDataProvider,
   type NewsProvider,
 } from '@my-soso/providers';
+import { schema, withTenantUser, type Database } from '@my-soso/db';
+import { ensureDefaultWatchlist } from './watchlist.js';
 
 const SymbolArg = z
   .string()
@@ -15,17 +18,27 @@ const SymbolArg = z
   .regex(/^[A-Za-z0-9._-]+$/, 'symbols must be alphanumeric, dot, dash or underscore')
   .describe('Asset ticker (e.g. "BTC", "ETH", "SOL").');
 
-interface BuildToolsOptions {
+export interface ToolDeps {
   market: MarketDataProvider;
   news: NewsProvider;
+  db: Database;
+  /** Authenticated user. Watchlist mutations are scoped to this id. */
+  userId: string;
 }
 
 /**
- * Returns the structured fields the model sees as a tool result.
- * The mapping is deliberate: we hand the model summarised, plain
- * fields rather than raw provider DTOs so the prompt stays small.
+ * Builds the per-message tool set. Tools that mutate user state
+ * (addToWatchlist, removeFromWatchlist) close over `userId` and
+ * write through `withTenantUser` so RLS enforces the tenant
+ * boundary at the database — even a malicious tool argument
+ * cannot reach another user's row.
+ *
+ * The bundle is rebuilt per agent.run() call. The cost is small
+ * (closure allocation) and it keeps the per-user context purely
+ * inside the function rather than threading it through Vercel AI
+ * SDK internals.
  */
-export function buildAgentTools({ market, news }: BuildToolsOptions) {
+export function buildAgentTools({ market, news, db, userId }: ToolDeps) {
   return {
     getPrice: tool({
       description:
@@ -79,6 +92,88 @@ export function buildAgentTools({ market, news }: BuildToolsOptions) {
         } catch (err) {
           return mapToolError(err, symbol);
         }
+      },
+    }),
+
+    listWatchlist: tool({
+      description:
+        "List the symbols currently on the user's watchlist. No arguments. Returns an array of {symbol, assetKind} objects.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const watchlist = await ensureDefaultWatchlist(db, userId);
+        const items = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .select()
+            .from(schema.watchlistItems)
+            .where(eq(schema.watchlistItems.watchlistId, watchlist.id))
+            .orderBy(schema.watchlistItems.createdAt),
+        );
+        return {
+          ok: true as const,
+          items: items.map((i) => ({ symbol: i.assetSymbol, assetKind: i.assetKind })),
+        };
+      },
+    }),
+
+    addToWatchlist: tool({
+      description:
+        "Add a crypto asset to the user's watchlist by ticker symbol. Idempotent: adding a symbol already on the list is a NOOP.",
+      inputSchema: z.object({ symbol: SymbolArg }),
+      execute: async ({ symbol }) => {
+        const upper = symbol.toUpperCase();
+        // Validate the symbol exists upstream before writing — prevents
+        // typos like "BTCC" from polluting the user's list. resolveSymbol
+        // is private to the provider, so we use getPrice as the probe;
+        // the cache absorbs the cost on repeat asks.
+        try {
+          await market.getPrice(upper);
+        } catch (err) {
+          if (err instanceof UnknownSymbolError) {
+            return {
+              ok: false as const,
+              reason: 'unknown_symbol' as const,
+              message: `I don't recognise "${symbol}". Try the asset's standard ticker.`,
+            };
+          }
+          // Don't block on transient provider issues — accept the symbol.
+        }
+        const watchlist = await ensureDefaultWatchlist(db, userId);
+        await withTenantUser(db, userId, async (tx) =>
+          tx
+            .insert(schema.watchlistItems)
+            .values({
+              userId,
+              watchlistId: watchlist.id,
+              assetSymbol: upper,
+              assetKind: 'crypto',
+            })
+            .onConflictDoNothing(),
+        );
+        return { ok: true as const, symbol: upper };
+      },
+    }),
+
+    removeFromWatchlist: tool({
+      description: "Remove a crypto asset from the user's watchlist by ticker symbol.",
+      inputSchema: z.object({ symbol: SymbolArg }),
+      execute: async ({ symbol }) => {
+        const upper = symbol.toUpperCase();
+        const removed = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .delete(schema.watchlistItems)
+            .where(
+              and(
+                eq(schema.watchlistItems.userId, userId),
+                eq(schema.watchlistItems.assetSymbol, upper),
+              ),
+            )
+            .returning({ id: schema.watchlistItems.id }),
+        );
+        return {
+          ok: true as const,
+          symbol: upper,
+          removed: removed.length > 0,
+        };
       },
     }),
   };

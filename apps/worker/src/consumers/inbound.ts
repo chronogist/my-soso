@@ -128,6 +128,7 @@ export function startInboundConsumer({
                 const result = await agent.run({
                   userMessage: inbound.text,
                   conversationId: inbound.conversationId,
+                  userId: inbound.userId,
                 });
                 replyText = result.text;
               } catch (err) {

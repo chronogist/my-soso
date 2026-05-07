@@ -2,12 +2,15 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, stepCountIs, type LanguageModel } from 'ai';
 import type { Logger } from 'pino';
 import type { MarketDataProvider, NewsProvider } from '@my-soso/providers';
+import type { Database } from '@my-soso/db';
 import { buildAgentTools } from './tools.js';
 import { SYSTEM_PROMPT } from './system-prompt.js';
 
 export interface AgentDeps {
   market: MarketDataProvider;
   news: NewsProvider;
+  /** Database handle. Tools that mutate user state use this with withTenantUser. */
+  db: Database;
   log: Logger;
   anthropicApiKey: string;
   /** Anthropic model id. Default: claude-haiku-4-5-20251001. */
@@ -22,6 +25,8 @@ export interface RunAgentInput {
   userMessage: string;
   /** Stable conversation id; passed through to provider for tracing. */
   conversationId: string;
+  /** Authenticated user. Required so watchlist tools can write under RLS. */
+  userId: string;
 }
 
 export interface RunAgentResult {
@@ -40,10 +45,18 @@ export function createAgent(deps: AgentDeps): Agent {
   const model = anthropic(deps.model ?? 'claude-haiku-4-5-20251001') as LanguageModel;
   const maxSteps = deps.maxSteps ?? 4;
   const maxOutputTokens = deps.maxOutputTokens ?? 600;
-  const tools = buildAgentTools({ market: deps.market, news: deps.news });
 
   return {
-    run: async ({ userMessage, conversationId }) => {
+    run: async ({ userMessage, conversationId, userId }) => {
+      // Tools are rebuilt per call so the closures over `userId` are
+      // bounded to a single message — no chance of cross-tenant leak
+      // through a stale tool reference.
+      const tools = buildAgentTools({
+        market: deps.market,
+        news: deps.news,
+        db: deps.db,
+        userId,
+      });
       const result = await generateText({
         model,
         system: SYSTEM_PROMPT,

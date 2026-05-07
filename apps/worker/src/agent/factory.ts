@@ -83,6 +83,7 @@ export function buildAgentStack({
   const agent = createAgent({
     market: provider,
     news: provider,
+    db,
     log,
     anthropicApiKey: config.ANTHROPIC_API_KEY,
     model: config.ANTHROPIC_MODEL,

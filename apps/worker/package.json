@@ -21,6 +21,7 @@
     "@my-soso/shared-types": "workspace:*",
     "@sentry/node": "^10.51.0",
     "ai": "^6.0.175",
+    "drizzle-orm": "^0.45.2",
     "pino": "^10.1.0",
     "zod": "^4.4.0"
   },
