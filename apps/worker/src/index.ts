@@ -3,6 +3,7 @@ import { loadConfig } from './config.js';
 import { startInboundConsumer } from './consumers/inbound.js';
 import { startOutboundConsumer } from './consumers/outbound.js';
 import { startAlertEngine } from './consumers/alert-engine.js';
+import { startDigest } from './consumers/digest.js';
 import { startPrefetcher } from './consumers/prefetcher.js';
 import { buildAgentStack } from './agent/factory.js';
 import { startMetricsReporter } from './agent/metrics.js';
@@ -63,6 +64,21 @@ function main() {
       newsLookbackMs: config.ALERT_NEWS_LOOKBACK_MS,
     });
     consumers.push(alerts);
+  }
+
+  if (config.DIGEST_ENABLED) {
+    const digest = startDigest({
+      connection,
+      log,
+      db: stack.db,
+      market: stack.provider,
+      anthropicApiKey: config.ANTHROPIC_API_KEY,
+      model: config.ANTHROPIC_MODEL,
+      intervalMs: config.DIGEST_INTERVAL_MS,
+      dailyHourUtc: config.DIGEST_DAILY_HOUR_UTC,
+      weeklyDowUtc: config.DIGEST_WEEKLY_DOW_UTC,
+    });
+    consumers.push(digest);
   }
 
   log.info('worker ready');

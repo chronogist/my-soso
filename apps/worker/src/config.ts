@@ -54,6 +54,19 @@ const ConfigSchema = z.object({
     .int()
     .positive()
     .default(6 * 60 * 60_000),
+
+  /** Digest job: hourly tick, fires daily at this UTC hour, weekly on this UTC dow. */
+  DIGEST_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  DIGEST_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60_000),
+  DIGEST_DAILY_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(9),
+  DIGEST_WEEKLY_DOW_UTC: z.coerce.number().int().min(0).max(6).default(1),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

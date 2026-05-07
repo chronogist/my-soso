@@ -20,6 +20,9 @@ export const users = pgTable('users', {
   privyUserId: text('privy_user_id').notNull().unique(),
   walletAddress: text('wallet_address'),
   plan: text('plan').notNull().default('free'),
+  digestSchedule: text('digest_schedule', { enum: ['off', 'daily', 'weekly'] })
+    .notNull()
+    .default('off'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -178,6 +181,23 @@ export const agentAuditLog = pgTable(
     uniqueIndex('agent_audit_log_inbound_idx').on(t.conversationId, t.inboundIdempotencyKey),
   ],
 );
+
+export const digestDeliveries = pgTable(
+  'digest_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    channel: text('channel', { enum: ['telegram', 'discord', 'whatsapp'] }).notNull(),
+    schedule: text('schedule', { enum: ['daily', 'weekly'] }).notNull(),
+    periodKey: text('period_key').notNull(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('digest_deliveries_dedup_idx').on(t.userId, t.schedule, t.periodKey)],
+);
+export type DigestDelivery = typeof digestDeliveries.$inferSelect;
+export type NewDigestDelivery = typeof digestDeliveries.$inferInsert;
 
 export type Alert = typeof alerts.$inferSelect;
 export type NewAlert = typeof alerts.$inferInsert;
