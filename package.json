@@ -25,6 +25,7 @@
     "dev:worker": "pnpm --filter @my-soso/worker dev",
     "dev:api": "pnpm --filter @my-soso/api dev",
     "dev:dashboard": "pnpm --filter @my-soso/dashboard dev",
+    "discord:register": "pnpm --filter @my-soso/edge discord:register",
     "db:generate": "pnpm --filter @my-soso/db db:generate",
     "db:migrate": "pnpm --filter @my-soso/db db:migrate",
     "db:studio": "pnpm --filter @my-soso/db db:studio",
