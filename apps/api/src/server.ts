@@ -1,7 +1,7 @@
 import cors from '@fastify/cors';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { createConnection } from '@my-soso/queue';
-import { healthCheck, createDb } from '@my-soso/db';
+import { healthCheck, createDb, closeDb } from '@my-soso/db';
 import type { Config } from './config.js';
 import { createPrivyVerifier } from './auth/privy.js';
 import { buildLoggerOptions } from './logger.js';
@@ -33,7 +33,7 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
     });
   });
 
-  const db = createDb({ url: config.DATABASE_URL, max: 2 });
+  const db = createDb({ url: config.DATABASE_URL, max: 10 });
   app.get('/healthz', async () => ({
     service: 'api',
     env: config.NODE_ENV,
@@ -44,13 +44,15 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   const verifier = await createPrivyVerifier({
     appId: config.PRIVY_APP_ID,
     verificationKey: config.PRIVY_JWT_VERIFICATION_KEY,
+    jwksUrl: config.PRIVY_JWKS_URL,
   });
 
   app.addHook('onClose', async () => {
     await redis.quit();
+    await closeDb(db);
   });
 
-  registerV1Routes(app, { config, verifier, redis });
+  registerV1Routes(app, { config, verifier, redis, db });
 
   return app;
 }

@@ -31,7 +31,8 @@ export type InboundJob = z.infer<typeof InboundJobSchema>;
  * delivery worker.
  */
 export const OutboundJobSchema = z.object({
-  userId: z.string().uuid(),
+  /** Null for replies sent before a channel link exists (e.g. unlinked-user prompts). */
+  userId: z.string().uuid().nullable(),
   channel: ChannelEnum,
   externalUserId: z.string().min(1),
   conversationId: z.string().min(1),

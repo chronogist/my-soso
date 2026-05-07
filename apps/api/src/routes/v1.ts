@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomInt } from 'node:crypto';
-import { createDb, schema, withServiceContext, withTenantUser, type Database } from '@my-soso/db';
+import { schema, withServiceContext, withTenantUser, type Database } from '@my-soso/db';
 import type { Redis } from '@my-soso/queue';
 import { z } from 'zod';
 import type { Config } from '../config.js';
@@ -13,13 +13,15 @@ const SessionSyncSchema = z.object({
   walletAddress: z.string().min(1).optional(),
 });
 const LinkCodeSchema = z.object({ channel: ChannelSchema });
+const SymbolSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(20)
+  .regex(/^[A-Za-z0-9._-]+$/);
+
 const WatchlistItemSchema = z.object({
-  symbol: z
-    .string()
-    .trim()
-    .min(1)
-    .max(20)
-    .regex(/^[A-Za-z0-9._-]+$/),
+  symbol: SymbolSchema,
   assetKind: z.string().trim().min(1).max(32).default('crypto'),
 });
 
@@ -60,34 +62,51 @@ async function upsertUserForPrivy(
 ) {
   const email = input.email ?? fallbackEmail(claims.privyUserId);
 
-  const [user] = await withServiceContext(db, async (tx) =>
-    tx
-      .insert(schema.users)
-      .values({
-        privyUserId: claims.privyUserId,
-        email,
-        walletAddress: input.walletAddress,
-      })
-      .onConflictDoUpdate({
-        target: schema.users.privyUserId,
-        set: {
+  // Email is set on creation only — the API cannot independently verify a
+  // client-supplied email, so we don't let subsequent /v1/session calls
+  // overwrite it. Wallet address is filled in once the embedded wallet is
+  // ready, but never changed thereafter.
+  let user;
+  try {
+    [user] = await withServiceContext(db, async (tx) =>
+      tx
+        .insert(schema.users)
+        .values({
+          privyUserId: claims.privyUserId,
           email,
           walletAddress: input.walletAddress,
-        },
-      })
-      .returning(),
-  );
+        })
+        .onConflictDoUpdate({
+          target: schema.users.privyUserId,
+          set: {
+            walletAddress: sql`coalesce(${schema.users.walletAddress}, excluded.wallet_address)`,
+          },
+        })
+        .returning(),
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/duplicate key.*users_email_unique|users_email_key/i.test(msg)) {
+      throw Object.assign(new Error('email already in use'), { statusCode: 409 });
+    }
+    throw err;
+  }
 
   if (!user) throw new Error('failed to upsert user');
   await ensureDefaultWatchlist(db, user.id);
   return user;
 }
 
-async function loadUserForPrivy(db: Database, claims: VerifiedPrivyClaims) {
+async function requireUserForPrivy(db: Database, claims: VerifiedPrivyClaims) {
   const [user] = await withServiceContext(db, async (tx) =>
     tx.select().from(schema.users).where(eq(schema.users.privyUserId, claims.privyUserId)).limit(1),
   );
-  return user ?? upsertUserForPrivy(db, claims, {});
+  if (!user) {
+    throw Object.assign(new Error('user not provisioned; call /v1/session first'), {
+      statusCode: 404,
+    });
+  }
+  return user;
 }
 
 async function ensureDefaultWatchlist(db: Database, userId: string) {
@@ -138,19 +157,14 @@ export function registerV1Routes(
     config,
     verifier,
     redis,
+    db,
   }: {
     config: Config;
     verifier: PrivyVerifier;
     redis: Redis;
+    db: Database;
   },
 ): void {
-  const db = createDb({ url: config.DATABASE_URL });
-
-  app.addHook('onClose', async () => {
-    // postgres-js closes when the process exits; Drizzle does not currently
-    // expose the client through our Database wrapper. Keep this hook reserved.
-  });
-
   app.post('/v1/session', async (req) => {
     const claims = await requireAuth(req, verifier);
     const input = SessionSyncSchema.parse(req.body ?? {});
@@ -160,13 +174,13 @@ export function registerV1Routes(
 
   app.get('/v1/me', async (req) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
+    const user = await requireUserForPrivy(db, claims);
     return { user: publicUser(user) };
   });
 
   app.post('/v1/link-codes', async (req) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
+    const user = await requireUserForPrivy(db, claims);
     const { channel } = LinkCodeSchema.parse(req.body ?? {});
 
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -193,7 +207,7 @@ export function registerV1Routes(
 
   app.get('/v1/channel-links', async (req) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
+    const user = await requireUserForPrivy(db, claims);
     const links = await withTenantUser(db, user.id, async (tx) =>
       tx
         .select()
@@ -214,7 +228,7 @@ export function registerV1Routes(
 
   app.get('/v1/watchlist', async (req) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
+    const user = await requireUserForPrivy(db, claims);
     const watchlist = await ensureDefaultWatchlist(db, user.id);
     const items = await withTenantUser(db, user.id, async (tx) =>
       tx
@@ -241,7 +255,7 @@ export function registerV1Routes(
 
   app.post('/v1/watchlist/items', async (req) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
+    const user = await requireUserForPrivy(db, claims);
     const watchlist = await ensureDefaultWatchlist(db, user.id);
     const input = WatchlistItemSchema.parse(req.body ?? {});
     const symbol = input.symbol.toUpperCase();
@@ -263,8 +277,8 @@ export function registerV1Routes(
 
   app.delete('/v1/watchlist/items/:symbol', async (req, reply) => {
     const claims = await requireAuth(req, verifier);
-    const user = await loadUserForPrivy(db, claims);
-    const params = z.object({ symbol: z.string().min(1) }).parse(req.params);
+    const user = await requireUserForPrivy(db, claims);
+    const params = z.object({ symbol: SymbolSchema }).parse(req.params);
 
     await withTenantUser(db, user.id, async (tx) =>
       tx

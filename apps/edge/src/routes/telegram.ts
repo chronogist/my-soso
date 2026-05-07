@@ -28,7 +28,9 @@ const LinkCodePayloadSchema = z.object({
 });
 
 function parseLinkCommand(text: string): string | null {
-  const match = /^\/link(?:@\w+)?\s+([A-Z0-9]{6})$/i.exec(text.trim());
+  // Alphabet must match LINK_ALPHABET in the API: 0/1/I/O are excluded to avoid
+  // visual confusion. Codes are issued uppercase but accept lowercase input.
+  const match = /^\/link(?:@\w+)?\s+([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/i.exec(text.trim());
   return match?.[1]?.toUpperCase() ?? null;
 }
 
@@ -68,7 +70,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
     text,
     idempotencyKey,
   }: {
-    userId: string;
+    userId: string | null;
     externalUserId: string;
     conversationId: string;
     text: string;
@@ -122,12 +124,16 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
     const linkCode = parseLinkCommand(message.text);
 
     if (linkCode) {
-      const raw = await connection.get(`link_code:${linkCode}`);
+      // Atomic read-and-delete prevents two concurrent /link redemptions
+      // from both passing the existence check. After this call the code
+      // is gone whether the DB write succeeds or not — on failure the
+      // user is told to generate a fresh code.
+      const raw = await connection.getdel(`link_code:${linkCode}`);
       const linkPayload = parseLinkPayload(raw);
 
       if (!linkPayload?.success || linkPayload.data.channel !== 'telegram') {
         await enqueueTelegramReply({
-          userId: '00000000-0000-0000-0000-000000000000',
+          userId: null,
           externalUserId,
           conversationId,
           text: 'That link code is expired or invalid. Open the My-Soso dashboard and generate a fresh Telegram code.',
@@ -156,12 +162,11 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
           userId: linkPayload.data.userId,
           externalUserId,
           conversationId,
-          text: 'I could not link this Telegram account. It may already be connected to another My-Soso account.',
+          text: 'I could not link this Telegram account. It may already be connected to another My-Soso account. Generate a fresh code from the dashboard and try again.',
           idempotencyKey: `link-conflict:${idempotencyKey}`,
         });
         return reply.status(200).send({ ok: true });
       }
-      await connection.del(`link_code:${linkCode}`);
 
       await enqueueTelegramReply({
         userId: linkPayload.data.userId,
@@ -189,7 +194,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
 
     if (!channelLink) {
       await enqueueTelegramReply({
-        userId: '00000000-0000-0000-0000-000000000000',
+        userId: null,
         externalUserId,
         conversationId,
         text: 'I am ready, but this Telegram chat is not linked yet. Sign in to the My-Soso dashboard, generate a Telegram code, then send /link CODE here.',

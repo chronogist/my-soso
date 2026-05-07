@@ -62,6 +62,11 @@ export async function withServiceContext<T>(
   });
 }
 
+/** Close the underlying postgres-js connection pool. Safe to call once at shutdown. */
+export async function closeDb(db: Database): Promise<void> {
+  await db.$client.end({ timeout: 5 });
+}
+
 /** Cheap connectivity probe for liveness/readiness checks. */
 export async function healthCheck(
   db: Database,
