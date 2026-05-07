@@ -2,6 +2,7 @@ import { createConnection } from '@my-soso/queue';
 import { loadConfig } from './config.js';
 import { startInboundConsumer } from './consumers/inbound.js';
 import { startOutboundConsumer } from './consumers/outbound.js';
+import { startPrefetcher } from './consumers/prefetcher.js';
 import { buildAgentStack } from './agent/factory.js';
 import { buildLogger } from './logger.js';
 import { initSentry } from './sentry.js';
@@ -29,6 +30,17 @@ function main() {
   });
 
   const consumers: Shutdownable[] = [inbound, outbound, stack];
+
+  if (config.PREFETCH_ENABLED && config.PREFETCH_SYMBOLS.length > 0) {
+    const prefetcher = startPrefetcher({
+      connection,
+      log,
+      provider: stack.provider,
+      symbols: config.PREFETCH_SYMBOLS,
+      intervalMs: config.PREFETCH_INTERVAL_MS,
+    });
+    consumers.push(prefetcher);
+  }
 
   log.info('worker ready');
 
