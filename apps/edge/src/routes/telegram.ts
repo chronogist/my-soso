@@ -54,6 +54,14 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
       return reply.status(200).send({ ok: true });
     }
 
+    // Wave 1 only handles 1:1 personal-finance conversations. Group/channel
+    // posts are intentionally ignored to avoid surprising broadcast behaviour
+    // and to keep watchlists scoped to a single user.
+    if (message.chat.type !== 'private') {
+      req.log.info({ chatType: message.chat.type }, 'telegram non-private chat ignored');
+      return reply.status(200).send({ ok: true });
+    }
+
     const conversationId = String(message.chat.id);
     const idempotencyKey = `telegram:${parsed.data.update_id}`;
 
