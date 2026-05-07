@@ -18,15 +18,15 @@ Crypto holders and active traders who already live in Telegram, Discord, or What
 
 ## Where we are
 
-Wave 1 is split into 5 phases. Phases 1, 2, and 3 are complete. Phase 4 is next.
+Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 
 | Phase | What | State |
 |---|---|---|
 | 1 | Foundation: monorepo, DB+RLS, queue, Edge, Worker, Telegram round-trip | ✅ done |
 | 2 | Privy auth + channel linking + real user resolution | ✅ done |
 | 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | ✅ done |
-| 4 | Watchlists + alert engine + news filter + digest | ⏭ next |
-| 5 | Discord + WhatsApp adapters + compliance classifier + demo polish | — |
+| 4 | Watchlists + alert engine + news filter + digest | ✅ done |
+| 5 | Discord + WhatsApp adapters + compliance classifier + demo polish | ⏭ next |
 
 ---
 
@@ -66,12 +66,13 @@ Wave 1 is split into 5 phases. Phases 1, 2, and 3 are complete. Phase 4 is next.
 - [x] Replace echo fallback in inbound consumer with real agent
 - [x] Cache hit rate metric
 
-### Tools, watchlists, alerts (Phase 4)
-- [ ] Remaining tools: `getETFFlow`, `getIndex`, `listIndices`, watchlist CRUD, alert CRUD, `generateMemo`
-- [ ] Daily/weekly digest scheduled BullMQ repeatable job
-- [ ] Alert engine: rule eval against cache + news-relevance with one-LLM-extraction-per-article
-- [ ] `notification_deliveries` dedup constraint
-- [ ] Audit log on every advice-class response
+### Tools, watchlists, alerts (Phase 4) — done
+- [x] Remaining tools: `getETFFlow`, `getIndex`, `listIndices`, watchlist CRUD, alert CRUD
+- [x] Daily/weekly digest scheduled BullMQ repeatable job
+- [x] Alert engine: rule eval against cache + news-relevance with one-LLM-extraction-per-article
+- [x] `notification_deliveries` dedup constraint
+- [x] Audit log on every agent response (classifier in phase 5 upgrades the column)
+- [ ] `generateMemo` tool — deferred; not on the critical path for the wave 1 demo
 
 ### Multi-channel + compliance + demo (Phase 5)
 - [ ] Discord HTTP Interactions adapter with deferred response (`type: 5`)
