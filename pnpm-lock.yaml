@@ -190,6 +190,9 @@ importers:
 
   packages/providers:
     dependencies:
+      '@my-soso/queue':
+        specifier: workspace:*
+        version: link:../queue
       zod:
         specifier: ^4.4.0
         version: 4.4.3

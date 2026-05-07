@@ -14,6 +14,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@my-soso/queue": "workspace:*",
     "zod": "^4.4.0"
   }
 }
