@@ -2,6 +2,10 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  index,
+  integer,
+  jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -84,6 +88,105 @@ export const providerUsageBudgets = pgTable(
 
 export type ProviderUsageBudget = typeof providerUsageBudgets.$inferSelect;
 export type NewProviderUsageBudget = typeof providerUsageBudgets.$inferInsert;
+
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['price', 'news'] }).notNull(),
+    assetSymbol: text('asset_symbol').notNull(),
+    assetKind: text('asset_kind').notNull().default('crypto'),
+    priceOp: text('price_op', { enum: ['lt', 'lte', 'gt', 'gte'] }),
+    priceThreshold: numeric('price_threshold'),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastFiredAt: timestamp('last_fired_at', { withTimezone: true }),
+  },
+  (t) => [index('alerts_user_idx').on(t.userId), index('alerts_symbol_idx').on(t.assetSymbol)],
+);
+
+export const notificationDeliveries = pgTable(
+  'notification_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    alertId: uuid('alert_id')
+      .notNull()
+      .references(() => alerts.id, { onDelete: 'cascade' }),
+    channel: text('channel', { enum: ['telegram', 'discord', 'whatsapp'] }).notNull(),
+    dedupKey: text('dedup_key').notNull(),
+    payload: jsonb('payload').notNull().default({}),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('notification_deliveries_dedup_idx').on(t.userId, t.alertId, t.dedupKey),
+    index('notification_deliveries_user_time_idx').on(t.userId, t.deliveredAt),
+  ],
+);
+
+export const newsExtractions = pgTable(
+  'news_extractions',
+  {
+    articleId: text('article_id').primaryKey(),
+    source: text('source').notNull(),
+    title: text('title').notNull(),
+    url: text('url'),
+    affectedAssets: text('affected_assets')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    sentiment: text('sentiment', { enum: ['bullish', 'bearish', 'neutral'] }).notNull(),
+    severity: text('severity', { enum: ['low', 'medium', 'high'] }).notNull(),
+    summary: text('summary').notNull(),
+    model: text('model').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    extractedAt: timestamp('extracted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('news_extractions_published_idx').on(t.publishedAt)],
+);
+
+export const agentAuditLog = pgTable(
+  'agent_audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    conversationId: text('conversation_id').notNull(),
+    inboundIdempotencyKey: text('inbound_idempotency_key').notNull(),
+    channel: text('channel').notNull(),
+    userMessage: text('user_message').notNull(),
+    responseText: text('response_text').notNull(),
+    classification: text('classification', {
+      enum: ['market_info', 'education', 'personalized_analysis', 'recommendation', 'execution'],
+    })
+      .notNull()
+      .default('market_info'),
+    model: text('model').notNull(),
+    stepCount: integer('step_count').notNull().default(0),
+    totalTokens: integer('total_tokens'),
+    finishReason: text('finish_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('agent_audit_log_user_time_idx').on(t.userId, t.createdAt),
+    index('agent_audit_log_classification_idx').on(t.classification, t.createdAt),
+    uniqueIndex('agent_audit_log_inbound_idx').on(t.conversationId, t.inboundIdempotencyKey),
+  ],
+);
+
+export type Alert = typeof alerts.$inferSelect;
+export type NewAlert = typeof alerts.$inferInsert;
+export type NotificationDelivery = typeof notificationDeliveries.$inferSelect;
+export type NewNotificationDelivery = typeof notificationDeliveries.$inferInsert;
+export type NewsExtraction = typeof newsExtractions.$inferSelect;
+export type NewNewsExtraction = typeof newsExtractions.$inferInsert;
+export type AgentAuditLogRow = typeof agentAuditLog.$inferSelect;
+export type NewAgentAuditLogRow = typeof agentAuditLog.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
