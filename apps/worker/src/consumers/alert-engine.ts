@@ -348,6 +348,7 @@ async function fireDelivery(args: FireDeliveryArgs): Promise<void> {
       externalUserId: link.channelUserId,
       conversationId: link.channelUserId,
       text: message,
+      ...(link.channel === 'whatsapp' ? { whatsappTemplate: 'alert' as const } : {}),
       idempotencyKey: `alert:${alert.id}:${dedupKey}`,
     },
     { jobId: `alert:${alert.id}:${dedupKey}` },

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 const ChannelEnum = z.enum(['telegram', 'discord', 'whatsapp']);
+export const WhatsAppTemplateNameSchema = z.enum(['digest', 'alert', 'link_confirmation']);
+export type WhatsAppTemplateName = z.infer<typeof WhatsAppTemplateNameSchema>;
 
 /**
  * Inbound: a chat-platform message handed off from the Edge service
@@ -56,7 +58,7 @@ export const OutboundJobSchema = z.object({
    */
   idempotencyKey: z.string().min(1),
   /** Optional pre-approved WhatsApp template name when target is outside the 24h window. */
-  whatsappTemplate: z.string().optional(),
+  whatsappTemplate: WhatsAppTemplateNameSchema.optional(),
 });
 export type OutboundJob = z.infer<typeof OutboundJobSchema>;
 
