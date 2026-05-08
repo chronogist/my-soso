@@ -13,6 +13,7 @@ const SessionSyncSchema = z.object({
   walletAddress: z.string().min(1).optional(),
 });
 const LinkCodeSchema = z.object({ channel: ChannelSchema });
+const DigestScheduleSchema = z.enum(['off', 'daily', 'weekly']);
 const SymbolSchema = z
   .string()
   .trim()
@@ -24,6 +25,33 @@ const WatchlistItemSchema = z.object({
   symbol: SymbolSchema,
   assetKind: z.string().trim().min(1).max(32).default('crypto'),
 });
+const AlertIdParamsSchema = z.object({ id: z.string().uuid() });
+const PriceOpSchema = z.enum(['lt', 'lte', 'gt', 'gte']);
+const CreateAlertSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('price'),
+    symbol: SymbolSchema,
+    op: PriceOpSchema,
+    threshold: z.coerce.number().positive(),
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('crypto'),
+  }),
+  z.object({
+    kind: z.literal('news'),
+    symbol: SymbolSchema,
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('crypto'),
+  }),
+]);
+const UpdateAlertSchema = z
+  .object({
+    active: z.boolean().optional(),
+    name: z.string().trim().min(1).max(80).optional(),
+  })
+  .refine((input) => input.active !== undefined || input.name !== undefined, {
+    message: 'Provide at least one alert field to update',
+  });
+const DigestPreferenceSchema = z.object({ schedule: DigestScheduleSchema });
 
 const LINK_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -147,8 +175,31 @@ function publicUser(user: typeof schema.users.$inferSelect) {
     privyUserId: user.privyUserId,
     walletAddress: user.walletAddress,
     plan: user.plan,
+    digestSchedule: user.digestSchedule,
     createdAt: user.createdAt.toISOString(),
   };
+}
+
+function publicAlert(alert: typeof schema.alerts.$inferSelect) {
+  return {
+    id: alert.id,
+    name: alert.name,
+    kind: alert.kind,
+    symbol: alert.assetSymbol,
+    assetKind: alert.assetKind,
+    priceOp: alert.priceOp,
+    priceThreshold: alert.priceThreshold !== null ? Number(alert.priceThreshold) : null,
+    active: alert.active,
+    createdAt: alert.createdAt.toISOString(),
+    lastFiredAt: alert.lastFiredAt?.toISOString() ?? null,
+  };
+}
+
+function defaultAlertName(input: z.infer<typeof CreateAlertSchema>, symbol: string) {
+  if (input.name) return input.name;
+  if (input.kind === 'news') return `${symbol} breaking news`;
+  const direction = input.op === 'lt' || input.op === 'lte' ? 'drops below' : 'rises above';
+  return `${symbol} ${direction} $${input.threshold}`;
 }
 
 export function registerV1Routes(
@@ -292,5 +343,102 @@ export function registerV1Routes(
     );
 
     return reply.status(204).send();
+  });
+
+  app.get('/v1/alerts', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const alerts = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .select()
+        .from(schema.alerts)
+        .where(eq(schema.alerts.userId, user.id))
+        .orderBy(schema.alerts.createdAt),
+    );
+
+    return { alerts: alerts.map(publicAlert) };
+  });
+
+  app.post('/v1/alerts', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const input = CreateAlertSchema.parse(req.body ?? {});
+    const symbol = input.symbol.toUpperCase();
+
+    const [alert] = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .insert(schema.alerts)
+        .values({
+          userId: user.id,
+          name: defaultAlertName(input, symbol),
+          kind: input.kind,
+          assetSymbol: symbol,
+          assetKind: input.assetKind,
+          priceOp: input.kind === 'price' ? input.op : null,
+          priceThreshold: input.kind === 'price' ? input.threshold.toString() : null,
+          active: true,
+        })
+        .returning(),
+    );
+
+    if (!alert) throw new Error('failed to create alert');
+    return { alert: publicAlert(alert) };
+  });
+
+  app.patch('/v1/alerts/:id', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const params = AlertIdParamsSchema.parse(req.params);
+    const input = UpdateAlertSchema.parse(req.body ?? {});
+
+    const [alert] = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .update(schema.alerts)
+        .set(input)
+        .where(and(eq(schema.alerts.userId, user.id), eq(schema.alerts.id, params.id)))
+        .returning(),
+    );
+
+    if (!alert) {
+      throw Object.assign(new Error('alert not found'), { statusCode: 404 });
+    }
+    return { alert: publicAlert(alert) };
+  });
+
+  app.delete('/v1/alerts/:id', async (req, reply) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const params = AlertIdParamsSchema.parse(req.params);
+
+    await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .delete(schema.alerts)
+        .where(and(eq(schema.alerts.userId, user.id), eq(schema.alerts.id, params.id))),
+    );
+
+    return reply.status(204).send();
+  });
+
+  app.get('/v1/digest-preferences', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    return { schedule: user.digestSchedule };
+  });
+
+  app.put('/v1/digest-preferences', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const input = DigestPreferenceSchema.parse(req.body ?? {});
+
+    const [updated] = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .update(schema.users)
+        .set({ digestSchedule: input.schedule })
+        .where(eq(schema.users.id, user.id))
+        .returning({ digestSchedule: schema.users.digestSchedule }),
+    );
+
+    if (!updated) throw new Error('failed to update digest preferences');
+    return { schedule: updated.digestSchedule };
   });
 }
