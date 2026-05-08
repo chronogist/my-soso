@@ -8,7 +8,7 @@ const ConfigSchema = z
     DATABASE_URL: z.string().url(),
     REDIS_URL: z.string().url(),
     DASHBOARD_URL: z.string().url().default('http://localhost:3000'),
-    SENTRY_DSN: z.string().url().optional(),
+    SENTRY_DSN: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
     SENTRY_ENVIRONMENT: z.string().default('development'),
     PRIVY_APP_ID: z.string().min(1),
     PRIVY_JWT_VERIFICATION_KEY: z.string().min(1).optional(),
