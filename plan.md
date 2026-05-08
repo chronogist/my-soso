@@ -18,7 +18,7 @@ Crypto holders and active traders who already live in Telegram, Discord, or What
 
 ## Where we are
 
-Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
+Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now partially complete.
 
 | Phase | What | State |
 |---|---|---|
@@ -26,7 +26,7 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 | 2 | Privy auth + channel linking + real user resolution | ✅ done |
 | 3 | SoSoValue provider + cache + prefetcher + LLM agent (real Q&A) | ✅ done |
 | 4 | Watchlists + alert engine + news filter + digest | ✅ done |
-| 5 | Discord + WhatsApp adapters + compliance classifier + demo polish | ⏭ next |
+| 5 | Discord + WhatsApp adapters + compliance classifier + dashboard polish + demo polish | 🚧 in progress |
 
 ---
 
@@ -54,6 +54,8 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 - [x] Dashboard channel-link flow (generate code → user DMs `/link <code>` → write `channel_links`)
 - [x] Edge resolves real `userId` from `channel_links` (replace anonymous placeholder)
 - [x] Watchlist UI on dashboard (CRUD)
+- [x] Channel picker landing page with Telegram / WhatsApp / Discord selection
+- [x] Shared `/setup` hub with account summary, platform-specific link instructions, link-code timer, linked-channel list, and watchlist controls
 
 ### SoSoValue agent (Phase 3) — done
 - [x] `MarketDataProvider` + `NewsProvider` interfaces in `@my-soso/providers`
@@ -74,12 +76,15 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 - [x] Audit log on every agent response (classifier in phase 5 upgrades the column)
 - [ ] `generateMemo` tool — deferred; not on the critical path for the wave 1 demo
 
-### Multi-channel + compliance + demo (Phase 5)
-- [ ] Discord HTTP Interactions adapter with deferred response (`type: 5`)
-- [ ] Discord slash commands: `/ask`, `/watch`, `/alert`, `/memo`, `/link`
-- [ ] WhatsApp Cloud API adapter with template selection (24h-window logic)
+### Multi-channel + compliance + demo (Phase 5) — in progress
+- [x] Discord HTTP Interactions adapter with deferred response (`type: 5`)
+- [x] Discord slash commands: `/ask`, `/watch`, `/alert`, `/link`
+- [ ] Discord `/memo`
+- [x] WhatsApp Cloud API adapter with template selection (24h-window logic)
 - [ ] Pre-approve WhatsApp templates: digest, alert, link-confirmation
-- [ ] Compliance classifier + system prompt forbidding `recommendation`-class
+- [x] Compliance classifier + outbound fallback forbidding `recommendation`/`execution`-class replies
+- [ ] Extend dashboard setup UX with post-link guidance to actual live entrypoints (`@MySoSoBot`, Discord app install/interactions URL, WhatsApp number copy)
+- [x] Add dashboard surfaces for alert management and digest preferences (tabbed `/hub` with bot-personality, news filter, quiet hours, throttling, coverage, per-channel overrides, locked Wave-3 trading section). Worker-side enforcement of `users.preferences` is the follow-up.
 - [ ] Demo video + submission writeup
 
 ---
@@ -114,12 +119,30 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete. Phase 5 is next.
 
 ---
 
+## What’s next to build
+
+1. **Finish the setup-to-chat handoff**
+   - Wire the dashboard copy/actions to real production entrypoints for each platform.
+   - Telegram: bot username + webhook registration.
+   - Discord: app install, Interactions endpoint, slash-command registration, `/memo`.
+   - WhatsApp: real business number, webhook verification, approved templates.
+
+2. **Add user-facing controls that are already supported in the backend**
+   - Alert management UI on the dashboard.
+   - Digest preference / schedule UI on the dashboard.
+
+3. **Close the production-readiness gaps**
+   - Approve WhatsApp templates: `digest`, `alert`, `link-confirmation`.
+   - Resolve the worker-side `drizzle-orm` type/version mismatch so the repo is back to a clean compile.
+   - Produce the demo flow and submission writeup.
+
 ## How to resume
 
 1. `pnpm install`
-2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, plus Sentry optional.
+2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus Sentry optional.
 3. `pnpm db:migrate` to apply the SQL migrations to Supabase.
-4. `pnpm dev:edge` and `pnpm dev:worker` in two terminals.
-5. Expose Edge via ngrok and register the Telegram webhook with your `TELEGRAM_WEBHOOK_SECRET`.
-6. `/start` in Telegram → "Welcome to My-Soso..." — round-trip working.
-7. Phase 3 begins: build `@my-soso/providers`, SoSoValue cache/budgeting, and the first real agent tools.
+4. `pnpm dev:dashboard`, `pnpm dev:api`, `pnpm dev:edge`, and `pnpm dev:worker` in separate terminals.
+5. Open the dashboard, choose a platform, and use the `/setup` flow to generate a link code.
+6. Expose Edge publicly and register the appropriate webhook / interactions endpoint for Telegram, Discord, and WhatsApp.
+7. Register Discord slash commands with `pnpm discord:register`.
+8. Finish the remaining Phase 5 items in the “What’s next to build” section above.
