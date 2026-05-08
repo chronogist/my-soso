@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, type FormEvent } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import {
   apiFetch,
@@ -308,141 +308,261 @@ export function DashboardShell() {
   const channelMeta = CHANNELS.find((c) => c.id === chosenChannel)!;
   const isLinked = links.some((l) => l.channel === chosenChannel);
 
+  function generateLinkCode() {
+    run(async () => {
+      const accessToken = await token();
+      const next = await apiFetch<LinkCode>('/v1/link-codes', accessToken, {
+        method: 'POST',
+        body: JSON.stringify({ channel: chosenChannel }),
+      });
+      setLinkCode(next);
+    });
+  }
+
+  function addWatchlistItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    run(async () => {
+      const accessToken = await token();
+      await apiFetch('/v1/watchlist/items', accessToken, {
+        method: 'POST',
+        body: JSON.stringify({ symbol }),
+      });
+      setSymbol('');
+      const next = await apiFetch<{ watchlist: Watchlist }>('/v1/watchlist', accessToken);
+      setWatchlist(next.watchlist);
+    });
+  }
+
+  function removeWatchlistItem(itemSymbol: string) {
+    run(async () => {
+      const accessToken = await token();
+      await apiFetch(`/v1/watchlist/items/${encodeURIComponent(itemSymbol)}`, accessToken, {
+        method: 'DELETE',
+      });
+      const next = await apiFetch<{ watchlist: Watchlist }>('/v1/watchlist', accessToken);
+      setWatchlist(next.watchlist);
+    });
+  }
+
+  const accountIdShort = apiUser?.id
+    ? `SOSO-${apiUser.id.replace(/-/g, '').slice(0, 4).toUpperCase()}-${apiUser.id.replace(/-/g, '').slice(-2).toUpperCase()}`
+    : '...';
+  const walletShort = apiUser?.walletAddress
+    ? `${apiUser.walletAddress.slice(0, 5)}...${apiUser.walletAddress.slice(-4)}`
+    : 'Privy wallet pending';
+
+  const channelInstructions: Record<Channel, { handle: string; step1: React.ReactNode }> = {
+    telegram: {
+      handle: '@MySoSoBot',
+      step1: (
+        <>
+          Open Telegram and search for <strong>@MySoSoBot</strong>
+        </>
+      ),
+    },
+    whatsapp: {
+      handle: 'the MySoSo number',
+      step1: (
+        <>
+          Open WhatsApp and message <strong>the MySoSo number</strong>
+        </>
+      ),
+    },
+    discord: {
+      handle: 'MySoSo Bot',
+      step1: (
+        <>
+          Open Discord and DM <strong>MySoSo Bot</strong>
+        </>
+      ),
+    },
+  };
+  const instructions = channelInstructions[chosenChannel];
+
   return (
-    <main className="page-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Step 2 of 2 — {channelMeta.name}</p>
-          <h1>Set up your agent</h1>
-        </div>
-        <div className="topbar__actions">
-          <button className="ghost-button" onClick={clearChannel}>
-            Change channel
-          </button>
-          <button className="ghost-button" onClick={logout}>
-            Sign out
-          </button>
-        </div>
-      </header>
+    <main className="hub">
+      <div className="hub__brand">
+        <span className="entry__brand-dot" />
+        MySoSo
+      </div>
 
-      {error ? <div className="error-box">{error}</div> : null}
-
-      <section className="grid">
-        <article className="panel">
-          <p className="eyebrow">Account</p>
-          <h2>{apiUser?.email ?? 'Syncing account...'}</h2>
-          <p className="muted">User id: {apiUser?.id ?? '...'}</p>
-          <p className="muted">Wallet: {apiUser?.walletAddress ?? 'Privy wallet pending'}</p>
-        </article>
-
-        <article className="panel accent-panel">
-          <p className="eyebrow">{channelMeta.name} link</p>
-          <h2>
-            {isLinked ? 'Linked. You can DM your agent now.' : 'Generate a 10-minute link code'}
-          </h2>
-          <p className="muted">
-            {isLinked
-              ? `${channelMeta.name} is connected to this account. Open your DM with the bot and start asking questions.`
-              : `Send the command to the bot from your private ${channelMeta.name} chat. The bot will attach that ${channelMeta.name} id to this signed-in account.`}
-          </p>
-          {!isLinked ? (
-            <button
-              className="primary-button"
-              disabled={isPending}
-              onClick={() =>
-                run(async () => {
-                  const accessToken = await token();
-                  const next = await apiFetch<LinkCode>('/v1/link-codes', accessToken, {
-                    method: 'POST',
-                    body: JSON.stringify({ channel: chosenChannel }),
-                  });
-                  setLinkCode(next);
-                })
-              }
-            >
-              Generate /link code
+      <aside className="hub__sidebar">
+        <article className="hub__card">
+          <header className="hub__card-head">
+            <span className="hub__eyebrow">Account Summary</span>
+            <button className="hub__icon-btn" onClick={logout} aria-label="Sign out">
+              +
             </button>
-          ) : null}
-          {linkCode?.channel === chosenChannel ? (
-            <div className="code-card">
-              <span>{linkCode.command}</span>
-              <small>Expires in {Math.round(linkCode.expiresInSeconds / 60)} minutes</small>
-            </div>
-          ) : null}
+          </header>
+          <dl className="hub__meta">
+            <dt>Primary Email</dt>
+            <dd>{apiUser?.email ?? 'Syncing…'}</dd>
+            <dt>Account ID</dt>
+            <dd className="hub__mono">{accountIdShort}</dd>
+            <dt>Wallet Address</dt>
+            <dd className="hub__mono">{walletShort}</dd>
+          </dl>
         </article>
 
-        <article className="panel">
-          <p className="eyebrow">Linked channels</p>
-          <h2>{links.length === 0 ? 'No channels linked yet' : `${links.length} linked`}</h2>
-          <div className="stack">
-            {links.map((link) => (
-              <div className="row-card" key={link.id}>
-                <strong>{link.channel}</strong>
-                <span>{link.channelUserId}</span>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel">
-          <p className="eyebrow">Watchlist</p>
-          <h2>{watchlist?.name ?? 'Default'}</h2>
-          <form
-            className="inline-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              run(async () => {
-                const accessToken = await token();
-                await apiFetch('/v1/watchlist/items', accessToken, {
-                  method: 'POST',
-                  body: JSON.stringify({ symbol }),
-                });
-                setSymbol('');
-                const next = await apiFetch<{ watchlist: Watchlist }>('/v1/watchlist', accessToken);
-                setWatchlist(next.watchlist);
-              });
-            }}
-          >
+        <article className="hub__card">
+          <header className="hub__card-head">
+            <span className="hub__eyebrow">Watchlist Overview</span>
+          </header>
+          <form className="hub__add" onSubmit={addWatchlistItem}>
             <input
               value={symbol}
-              onChange={(event) => setSymbol(event.target.value)}
-              placeholder="BTC"
+              onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+              placeholder="Add symbol (e.g. BTC)"
               aria-label="Asset symbol"
             />
-            <button className="primary-button" disabled={!symbol.trim() || isPending}>
-              Add
+            <button type="submit" disabled={!symbol.trim() || isPending}>
+              + Add
             </button>
           </form>
-          <div className="pill-row">
-            {watchlist?.items.map((item) => (
-              <button
-                className="asset-pill"
-                key={item.id}
-                onClick={() =>
-                  run(async () => {
-                    const accessToken = await token();
-                    await apiFetch(
-                      `/v1/watchlist/items/${encodeURIComponent(item.symbol)}`,
-                      accessToken,
-                      {
-                        method: 'DELETE',
-                      },
-                    );
-                    const next = await apiFetch<{ watchlist: Watchlist }>(
-                      '/v1/watchlist',
-                      accessToken,
-                    );
-                    setWatchlist(next.watchlist);
-                  })
-                }
-              >
-                {item.symbol}
-                <span>×</span>
-              </button>
-            ))}
-          </div>
+          <ul className="hub__watchlist">
+            {watchlist?.items.length ? (
+              watchlist.items.map((item) => (
+                <li key={item.id}>
+                  <span className="hub__asset-icon">{item.symbol.slice(0, 1)}</span>
+                  <span className="hub__asset-name">{item.symbol}</span>
+                  <button
+                    className="hub__icon-btn hub__icon-btn--danger"
+                    aria-label={`Remove ${item.symbol}`}
+                    onClick={() => removeWatchlistItem(item.symbol)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path
+                        d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m1 0v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li className="hub__watchlist-empty">No assets watched yet.</li>
+            )}
+          </ul>
         </article>
+      </aside>
+
+      <section className="hub__main">
+        <div className="hub__main-head">
+          <span className={`hub__pill ${isLinked ? 'hub__pill--ok' : 'hub__pill--warn'}`}>
+            {isLinked ? 'LINKED' : 'NOT LINKED'}
+          </span>
+          <span className="hub__node">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M12 2L3 7l9 5 9-5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </svg>
+            ENCRYPTED NODE 04
+          </span>
+        </div>
+
+        <h1 className="hub__title">{channelMeta.name} Setup</h1>
+        <p className="hub__lede">
+          Connect your {channelMeta.name} account to receive real-time alerts and manage orders.
+        </p>
+
+        {error ? <div className="hub__error">{error}</div> : null}
+
+        {!isLinked ? (
+          <button
+            className="hub__cta"
+            disabled={isPending}
+            onClick={generateLinkCode}
+          >
+            {linkCode?.channel === chosenChannel ? 'Regenerate Link Code' : 'Generate Link Code'}
+          </button>
+        ) : (
+          <div className="hub__linked-banner">
+            {channelMeta.name} is connected. DM your agent any time.
+          </div>
+        )}
+
+        {linkCode?.channel === chosenChannel && !isLinked ? (
+          <LinkCodeCard code={linkCode} />
+        ) : null}
+
+        <div className="hub__instructions">
+          <h2 className="hub__section">Link Instructions</h2>
+          <ol>
+            <li>
+              <span className="hub__step">1</span>
+              <span>{instructions.step1}</span>
+            </li>
+            <li>
+              <span className="hub__step">2</span>
+              <span>Paste the command generated above into the chat.</span>
+            </li>
+          </ol>
+        </div>
+
+        <div className="hub__linked">
+          <h2 className="hub__section">Linked Channels ({links.length})</h2>
+          {links.length ? (
+            <ul className="hub__linked-list">
+              {links.map((link) => (
+                <li key={link.id}>
+                  <strong>{link.channel}</strong>
+                  <span className="hub__mono">{link.channelUserId}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="hub__linked-empty">No accounts connected yet.</div>
+          )}
+        </div>
+
+        <footer className="hub__footer">
+          <button className="hub__ghost" onClick={clearChannel}>
+            Change Platform
+          </button>
+          <button className="hub__ghost hub__ghost--danger" onClick={logout}>
+            Sign Out
+          </button>
+        </footer>
       </section>
     </main>
+  );
+}
+
+function LinkCodeCard({ code }: { code: LinkCode }) {
+  const [remaining, setRemaining] = useState(code.expiresInSeconds);
+
+  useEffect(() => {
+    setRemaining(code.expiresInSeconds);
+    const expiresAt = Date.now() + code.expiresInSeconds * 1000;
+    const id = setInterval(() => {
+      const next = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+      setRemaining(next);
+      if (next <= 0) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [code]);
+
+  const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+  const ss = String(remaining % 60).padStart(2, '0');
+
+  return (
+    <div className="hub__code">
+      <span className="hub__code-text">{code.command}</span>
+      <span className="hub__code-expiry">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        Expires in {mm}:{ss}
+      </span>
+    </div>
   );
 }
