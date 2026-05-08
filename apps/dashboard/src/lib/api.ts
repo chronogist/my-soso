@@ -4,8 +4,13 @@ export interface ApiUser {
   privyUserId: string;
   walletAddress: string | null;
   plan: string;
+  digestSchedule: DigestSchedule;
   createdAt: string;
 }
+
+export type DigestSchedule = 'off' | 'daily' | 'weekly';
+export type AlertKind = 'price' | 'news';
+export type PriceOp = 'lt' | 'lte' | 'gt' | 'gte';
 
 export interface ChannelLink {
   id: string;
@@ -33,6 +38,19 @@ export interface Watchlist {
   name: string;
   isDefault: boolean;
   items: WatchlistItem[];
+}
+
+export interface Alert {
+  id: string;
+  name: string;
+  kind: AlertKind;
+  symbol: string;
+  assetKind: string;
+  priceOp: PriceOp | null;
+  priceThreshold: number | null;
+  active: boolean;
+  createdAt: string;
+  lastFiredAt: string | null;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';

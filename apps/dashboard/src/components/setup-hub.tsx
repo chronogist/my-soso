@@ -6,21 +6,39 @@ import { usePrivy } from '@privy-io/react-auth';
 import {
   apiFetch,
   type ApiUser,
+  type Alert,
+  type AlertKind,
   type ChannelLink,
+  type DigestSchedule,
   type LinkCode,
+  type PriceOp,
   type Watchlist,
 } from '../lib/api';
-import {
-  CHANNELS,
-  type Channel,
-  persistChosenChannel,
-  readChosenChannel,
-} from '../lib/channels';
+import { CHANNELS, type Channel, persistChosenChannel, readChosenChannel } from '../lib/channels';
 
 interface PrivyProfile {
   email?: { address?: string };
   wallet?: { address?: string };
 }
+
+const TELEGRAM_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'MySoSoBot';
+const TELEGRAM_BOT_URL =
+  process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? `https://t.me/${TELEGRAM_BOT_USERNAME}`;
+const DISCORD_INSTALL_URL = process.env.NEXT_PUBLIC_DISCORD_INSTALL_URL;
+const DISCORD_INTERACTIONS_URL = process.env.NEXT_PUBLIC_DISCORD_INTERACTIONS_URL;
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '';
+const WHATSAPP_DEEPLINK = process.env.NEXT_PUBLIC_WHATSAPP_DEEPLINK;
+
+const DIGEST_OPTIONS: { value: DigestSchedule; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+];
+
+const PRICE_OP_OPTIONS: { value: PriceOp; label: string }[] = [
+  { value: 'gte', label: 'Rises above' },
+  { value: 'lte', label: 'Drops below' },
+];
 
 export function SetupHub() {
   const router = useRouter();
@@ -30,7 +48,13 @@ export function SetupHub() {
   const [links, setLinks] = useState<ChannelLink[]>([]);
   const [linkCode, setLinkCode] = useState<LinkCode | null>(null);
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [digestSchedule, setDigestSchedule] = useState<DigestSchedule>('off');
   const [symbol, setSymbol] = useState('');
+  const [alertSymbol, setAlertSymbol] = useState('');
+  const [alertKind, setAlertKind] = useState<AlertKind>('price');
+  const [alertOp, setAlertOp] = useState<PriceOp>('gte');
+  const [alertThreshold, setAlertThreshold] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -43,7 +67,6 @@ export function SetupHub() {
     startTransition(() => {
       void refreshAll().catch((e) => setError(e instanceof Error ? e.message : String(e)));
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, authenticated, chosenChannel]);
 
   async function token(): Promise<string> {
@@ -62,13 +85,17 @@ export function SetupHub() {
         walletAddress: profile?.wallet?.address,
       }),
     });
-    const [nextLinks, nextWatchlist] = await Promise.all([
+    const [nextLinks, nextWatchlist, nextAlerts, nextDigest] = await Promise.all([
       apiFetch<{ links: ChannelLink[] }>('/v1/channel-links', accessToken),
       apiFetch<{ watchlist: Watchlist }>('/v1/watchlist', accessToken),
+      apiFetch<{ alerts: Alert[] }>('/v1/alerts', accessToken),
+      apiFetch<{ schedule: DigestSchedule }>('/v1/digest-preferences', accessToken),
     ]);
     setApiUser(synced.user);
     setLinks(nextLinks.links);
     setWatchlist(nextWatchlist.watchlist);
+    setAlerts(nextAlerts.alerts);
+    setDigestSchedule(nextDigest.schedule);
   }
 
   function run(action: () => Promise<void>) {
@@ -115,6 +142,64 @@ export function SetupHub() {
     });
   }
 
+  function createAlert(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    run(async () => {
+      const accessToken = await token();
+      const body =
+        alertKind === 'price'
+          ? {
+              kind: 'price',
+              symbol: alertSymbol,
+              op: alertOp,
+              threshold: Number(alertThreshold),
+            }
+          : { kind: 'news', symbol: alertSymbol };
+      const next = await apiFetch<{ alert: Alert }>('/v1/alerts', accessToken, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      setAlerts((current) => [...current, next.alert]);
+      setAlertSymbol('');
+      setAlertThreshold('');
+    });
+  }
+
+  function toggleAlert(alert: Alert) {
+    run(async () => {
+      const accessToken = await token();
+      const next = await apiFetch<{ alert: Alert }>(`/v1/alerts/${alert.id}`, accessToken, {
+        method: 'PATCH',
+        body: JSON.stringify({ active: !alert.active }),
+      });
+      setAlerts((current) => current.map((item) => (item.id === alert.id ? next.alert : item)));
+    });
+  }
+
+  function deleteAlert(alertId: string) {
+    run(async () => {
+      const accessToken = await token();
+      await apiFetch(`/v1/alerts/${alertId}`, accessToken, { method: 'DELETE' });
+      setAlerts((current) => current.filter((alert) => alert.id !== alertId));
+    });
+  }
+
+  function updateDigest(schedule: DigestSchedule) {
+    setDigestSchedule(schedule);
+    run(async () => {
+      const accessToken = await token();
+      const next = await apiFetch<{ schedule: DigestSchedule }>(
+        '/v1/digest-preferences',
+        accessToken,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ schedule }),
+        },
+      );
+      setDigestSchedule(next.schedule);
+    });
+  }
+
   function changePlatform() {
     persistChosenChannel(null);
     setChosenChannel(null);
@@ -147,18 +232,57 @@ export function SetupHub() {
   const channelInstructions: Record<Channel, ReactNode> = {
     telegram: (
       <>
-        Open Telegram and search for <strong>@MySoSoBot</strong>
+        Open Telegram and message{' '}
+        <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer">
+          @{TELEGRAM_BOT_USERNAME}
+        </a>
       </>
     ),
     whatsapp: (
       <>
-        Open WhatsApp and message <strong>the MySoSo number</strong>
+        Open WhatsApp and message{' '}
+        {WHATSAPP_DEEPLINK ? (
+          <a href={WHATSAPP_DEEPLINK} target="_blank" rel="noreferrer">
+            {WHATSAPP_NUMBER || 'MySoSo'}
+          </a>
+        ) : (
+          <strong>{WHATSAPP_NUMBER || 'the MySoSo number'}</strong>
+        )}
       </>
     ),
     discord: (
       <>
-        Open Discord and DM <strong>MySoSo Bot</strong>
+        {DISCORD_INSTALL_URL ? (
+          <a href={DISCORD_INSTALL_URL} target="_blank" rel="noreferrer">
+            Install the MySoSo Discord app
+          </a>
+        ) : (
+          <strong>Install the MySoSo Discord app</strong>
+        )}
       </>
+    ),
+  };
+
+  const linkedChannel = links.find((l) => l.channel === chosenChannel);
+  const handoffActions: Record<Channel, ReactNode> = {
+    telegram: (
+      <a className="hub__action-link" href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer">
+        Open @{TELEGRAM_BOT_USERNAME}
+      </a>
+    ),
+    discord: DISCORD_INSTALL_URL ? (
+      <a className="hub__action-link" href={DISCORD_INSTALL_URL} target="_blank" rel="noreferrer">
+        Open Discord Install
+      </a>
+    ) : (
+      <span className="hub__action-link hub__action-link--muted">Discord install URL missing</span>
+    ),
+    whatsapp: WHATSAPP_DEEPLINK ? (
+      <a className="hub__action-link" href={WHATSAPP_DEEPLINK} target="_blank" rel="noreferrer">
+        Open WhatsApp Chat
+      </a>
+    ) : (
+      <span className="hub__action-link hub__action-link--muted">WhatsApp number missing</span>
     ),
   };
 
@@ -227,6 +351,25 @@ export function SetupHub() {
             )}
           </ul>
         </article>
+
+        <article className="hub__card">
+          <header className="hub__card-head">
+            <span className="hub__eyebrow">Digest Cadence</span>
+          </header>
+          <div className="hub__segmented" role="group" aria-label="Digest cadence">
+            {DIGEST_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                className={digestSchedule === option.value ? 'is-active' : ''}
+                disabled={isPending}
+                onClick={() => updateDigest(option.value)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </article>
       </aside>
 
       <section className="hub__main">
@@ -265,9 +408,7 @@ export function SetupHub() {
           </div>
         )}
 
-        {linkCode?.channel === chosenChannel && !isLinked ? (
-          <LinkCodeCard code={linkCode} />
-        ) : null}
+        {linkCode?.channel === chosenChannel && !isLinked ? <LinkCodeCard code={linkCode} /> : null}
 
         <div className="hub__instructions">
           <h2 className="hub__section">Link Instructions</h2>
@@ -281,6 +422,114 @@ export function SetupHub() {
               <span>Paste the command generated above into the chat.</span>
             </li>
           </ol>
+        </div>
+
+        <div className="hub__handoff">
+          <div>
+            <h2 className="hub__section">Live Entrypoint</h2>
+            <p>
+              {isLinked
+                ? `${channelMeta.name} is linked to ${linkedChannel?.channelUserId ?? 'your account'}.`
+                : `Generate a link code, then use the ${channelMeta.name} entrypoint.`}
+            </p>
+            {chosenChannel === 'discord' && DISCORD_INTERACTIONS_URL ? (
+              <span className="hub__endpoint">{DISCORD_INTERACTIONS_URL}</span>
+            ) : null}
+          </div>
+          {handoffActions[chosenChannel]}
+        </div>
+
+        <div className="hub__controls">
+          <header className="hub__controls-head">
+            <h2 className="hub__section">Alerts</h2>
+            <span>{alerts.filter((alert) => alert.active).length} active</span>
+          </header>
+
+          <form className="hub__alert-form" onSubmit={createAlert}>
+            <input
+              value={alertSymbol}
+              onChange={(event) => setAlertSymbol(event.target.value.toUpperCase())}
+              placeholder="Symbol"
+              aria-label="Alert asset symbol"
+            />
+            <select
+              value={alertKind}
+              onChange={(event) => setAlertKind(event.target.value as AlertKind)}
+              aria-label="Alert type"
+            >
+              <option value="price">Price</option>
+              <option value="news">News</option>
+            </select>
+            {alertKind === 'price' ? (
+              <>
+                <select
+                  value={alertOp}
+                  onChange={(event) => setAlertOp(event.target.value as PriceOp)}
+                  aria-label="Price condition"
+                >
+                  {PRICE_OP_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={alertThreshold}
+                  onChange={(event) => setAlertThreshold(event.target.value)}
+                  inputMode="decimal"
+                  placeholder="USD"
+                  aria-label="Price threshold"
+                />
+              </>
+            ) : null}
+            <button
+              type="submit"
+              disabled={
+                !alertSymbol.trim() ||
+                (alertKind === 'price' && !alertThreshold.trim()) ||
+                isPending
+              }
+            >
+              Add Alert
+            </button>
+          </form>
+
+          <ul className="hub__alerts">
+            {alerts.length ? (
+              alerts.map((alert) => (
+                <li key={alert.id}>
+                  <button
+                    className={`hub__toggle ${alert.active ? 'is-active' : ''}`}
+                    type="button"
+                    aria-label={`${alert.active ? 'Pause' : 'Resume'} ${alert.name}`}
+                    onClick={() => toggleAlert(alert)}
+                  />
+                  <div>
+                    <strong>{alert.name}</strong>
+                    <span>{formatAlertDetail(alert)}</span>
+                  </div>
+                  <button
+                    className="hub__icon-btn hub__icon-btn--danger"
+                    aria-label={`Delete ${alert.name}`}
+                    onClick={() => deleteAlert(alert.id)}
+                    type="button"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path
+                        d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m1 0v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li className="hub__linked-empty">No alerts configured yet.</li>
+            )}
+          </ul>
         </div>
 
         <div className="hub__linked">
@@ -316,6 +565,12 @@ export function SetupHub() {
       </section>
     </main>
   );
+}
+
+function formatAlertDetail(alert: Alert) {
+  if (alert.kind === 'news') return `${alert.symbol} news`;
+  const direction = alert.priceOp === 'lt' || alert.priceOp === 'lte' ? 'below' : 'above';
+  return `${alert.symbol} ${direction} $${alert.priceThreshold ?? '-'}`;
 }
 
 function LinkCodeCard({ code }: { code: LinkCode }) {
