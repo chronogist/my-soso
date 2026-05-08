@@ -24,10 +24,10 @@ export function inboundQueueFor(
   conversationId: string,
   partitions = INBOUND_PARTITION_COUNT,
 ): string {
-  return `${QueueNames.inboundPrefix}:${partitionFor(conversationId, partitions)}`;
+  return `${QueueNames.inboundPrefix}-${partitionFor(conversationId, partitions)}`;
 }
 
 /** All inbound queue names a worker should consume from. */
 export function allInboundQueueNames(partitions = INBOUND_PARTITION_COUNT): string[] {
-  return Array.from({ length: partitions }, (_, i) => `${QueueNames.inboundPrefix}:${i}`);
+  return Array.from({ length: partitions }, (_, i) => `${QueueNames.inboundPrefix}-${i}`);
 }
