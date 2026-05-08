@@ -27,6 +27,8 @@ const WatchlistItemSchema = z.object({
 });
 const AlertIdParamsSchema = z.object({ id: z.string().uuid() });
 const PriceOpSchema = z.enum(['lt', 'lte', 'gt', 'gte']);
+const FlowDirectionSchema = z.enum(['inflow', 'outflow', 'either']);
+const SentimentSchema = z.enum(['bullish', 'bearish', 'either']);
 const CreateAlertSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('price'),
@@ -42,7 +44,130 @@ const CreateAlertSchema = z.discriminatedUnion('kind', [
     name: z.string().trim().min(1).max(80).optional(),
     assetKind: z.string().trim().min(1).max(32).default('crypto'),
   }),
+  z.object({
+    kind: z.literal('etf_flow'),
+    symbol: SymbolSchema,
+    direction: FlowDirectionSchema.default('either'),
+    minUsd: z.coerce.number().positive(),
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('etf'),
+  }),
+  z.object({
+    kind: z.literal('index_move'),
+    symbol: SymbolSchema,
+    movePct: z.coerce.number().positive(),
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('index'),
+  }),
+  z.object({
+    kind: z.literal('sentiment'),
+    symbol: SymbolSchema,
+    direction: SentimentSchema.default('either'),
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('crypto'),
+  }),
+  z.object({
+    kind: z.literal('macro'),
+    symbol: SymbolSchema.default('GLOBAL'),
+    severity: z.enum(['low', 'medium', 'high']).default('high'),
+    name: z.string().trim().min(1).max(80).optional(),
+    assetKind: z.string().trim().min(1).max(32).default('macro'),
+  }),
 ]);
+const ChannelOverrideSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    tone: z.enum(['concise', 'detailed', 'casual', 'formal']).optional(),
+    muteAlerts: z.boolean().optional(),
+  })
+  .strict();
+const PreferencesSchema = z
+  .object({
+    tone: z.enum(['concise', 'detailed', 'casual', 'formal']).default('concise'),
+    verbosity: z.enum(['short', 'normal', 'long']).default('normal'),
+    language: z.string().trim().min(2).max(8).default('en'),
+    timezone: z.string().trim().min(1).max(64).default('UTC'),
+    digestTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .default('08:00'),
+    digestWeekday: z.number().int().min(0).max(6).default(1),
+    digestSections: z
+      .array(z.enum(['prices', 'news', 'etf_flows', 'indices', 'macro']))
+      .default(['prices', 'news']),
+    quietHours: z
+      .object({
+        enabled: z.boolean().default(false),
+        start: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .default('22:00'),
+        end: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .default('07:00'),
+      })
+      .default({ enabled: false, start: '22:00', end: '07:00' }),
+    throttling: z
+      .object({
+        maxPerHour: z.number().int().min(0).max(60).default(6),
+        maxPerDay: z.number().int().min(0).max(500).default(40),
+      })
+      .default({ maxPerHour: 6, maxPerDay: 40 }),
+    newsFilter: z
+      .object({
+        strength: z.enum(['major_only', 'portfolio', 'all']).default('portfolio'),
+        sources: z.array(z.enum(['hot', 'featured', 'search'])).default(['hot', 'featured']),
+        explainImpact: z.boolean().default(true),
+      })
+      .default({
+        strength: 'portfolio',
+        sources: ['hot', 'featured'],
+        explainImpact: true,
+      }),
+    coverage: z
+      .object({
+        currencies: z.boolean().default(true),
+        etfs: z.boolean().default(true),
+        ssiIndices: z.boolean().default(true),
+        cryptoStocks: z.boolean().default(false),
+        btcTreasuries: z.boolean().default(false),
+        fundraising: z.boolean().default(false),
+        macro: z.boolean().default(false),
+      })
+      .default({
+        currencies: true,
+        etfs: true,
+        ssiIndices: true,
+        cryptoStocks: false,
+        btcTreasuries: false,
+        fundraising: false,
+        macro: false,
+      }),
+    formatting: z
+      .object({
+        includeCharts: z.boolean().default(false),
+        includeLinks: z.boolean().default(true),
+        includeCitations: z.boolean().default(true),
+        memoCommandEnabled: z.boolean().default(false),
+      })
+      .default({
+        includeCharts: false,
+        includeLinks: true,
+        includeCitations: true,
+        memoCommandEnabled: false,
+      }),
+    channelOverrides: z
+      .object({
+        telegram: ChannelOverrideSchema.optional(),
+        discord: ChannelOverrideSchema.optional(),
+        whatsapp: ChannelOverrideSchema.optional(),
+      })
+      .default({}),
+  })
+  .strict();
+type Preferences = z.infer<typeof PreferencesSchema>;
+const PREFERENCES_DEFAULTS: Preferences = PreferencesSchema.parse({});
 const UpdateAlertSchema = z
   .object({
     active: z.boolean().optional(),
@@ -189,6 +314,7 @@ function publicAlert(alert: typeof schema.alerts.$inferSelect) {
     assetKind: alert.assetKind,
     priceOp: alert.priceOp,
     priceThreshold: alert.priceThreshold !== null ? Number(alert.priceThreshold) : null,
+    params: (alert.params ?? {}) as Record<string, unknown>,
     active: alert.active,
     createdAt: alert.createdAt.toISOString(),
     lastFiredAt: alert.lastFiredAt?.toISOString() ?? null,
@@ -197,9 +323,50 @@ function publicAlert(alert: typeof schema.alerts.$inferSelect) {
 
 function defaultAlertName(input: z.infer<typeof CreateAlertSchema>, symbol: string) {
   if (input.name) return input.name;
-  if (input.kind === 'news') return `${symbol} breaking news`;
-  const direction = input.op === 'lt' || input.op === 'lte' ? 'drops below' : 'rises above';
-  return `${symbol} ${direction} $${input.threshold}`;
+  switch (input.kind) {
+    case 'news':
+      return `${symbol} breaking news`;
+    case 'price': {
+      const direction = input.op === 'lt' || input.op === 'lte' ? 'drops below' : 'rises above';
+      return `${symbol} ${direction} $${input.threshold}`;
+    }
+    case 'etf_flow': {
+      const dir =
+        input.direction === 'inflow'
+          ? 'inflow'
+          : input.direction === 'outflow'
+            ? 'outflow'
+            : 'flow';
+      return `${symbol} ETF ${dir} ≥ $${input.minUsd}`;
+    }
+    case 'index_move':
+      return `${symbol} index moves ±${input.movePct}%`;
+    case 'sentiment':
+      return `${symbol} sentiment ${input.direction === 'either' ? 'shift' : input.direction}`;
+    case 'macro':
+      return `Macro ${input.severity} severity event`;
+  }
+}
+
+function alertParams(input: z.infer<typeof CreateAlertSchema>): Record<string, unknown> {
+  switch (input.kind) {
+    case 'etf_flow':
+      return { direction: input.direction, minUsd: input.minUsd };
+    case 'index_move':
+      return { movePct: input.movePct };
+    case 'sentiment':
+      return { direction: input.direction };
+    case 'macro':
+      return { severity: input.severity };
+    case 'price':
+    case 'news':
+      return {};
+  }
+}
+
+function mergePreferences(stored: unknown): Preferences {
+  const base = stored && typeof stored === 'object' ? (stored as Record<string, unknown>) : {};
+  return PreferencesSchema.parse({ ...PREFERENCES_DEFAULTS, ...base });
 }
 
 export function registerV1Routes(
@@ -376,6 +543,7 @@ export function registerV1Routes(
           assetKind: input.assetKind,
           priceOp: input.kind === 'price' ? input.op : null,
           priceThreshold: input.kind === 'price' ? input.threshold.toString() : null,
+          params: alertParams(input),
           active: true,
         })
         .returning(),
@@ -440,5 +608,28 @@ export function registerV1Routes(
 
     if (!updated) throw new Error('failed to update digest preferences');
     return { schedule: updated.digestSchedule };
+  });
+
+  app.get('/v1/preferences', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    return { preferences: mergePreferences(user.preferences) };
+  });
+
+  app.put('/v1/preferences', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const incoming = mergePreferences(req.body ?? {});
+
+    const [updated] = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .update(schema.users)
+        .set({ preferences: incoming })
+        .where(eq(schema.users.id, user.id))
+        .returning({ preferences: schema.users.preferences }),
+    );
+
+    if (!updated) throw new Error('failed to update preferences');
+    return { preferences: mergePreferences(updated.preferences) };
   });
 }
