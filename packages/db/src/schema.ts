@@ -23,6 +23,7 @@ export const users = pgTable('users', {
   digestSchedule: text('digest_schedule', { enum: ['off', 'daily', 'weekly'] })
     .notNull()
     .default('off'),
+  preferences: jsonb('preferences').notNull().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -100,11 +101,14 @@ export const alerts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    kind: text('kind', { enum: ['price', 'news'] }).notNull(),
+    kind: text('kind', {
+      enum: ['price', 'news', 'etf_flow', 'index_move', 'sentiment', 'macro'],
+    }).notNull(),
     assetSymbol: text('asset_symbol').notNull(),
     assetKind: text('asset_kind').notNull().default('crypto'),
     priceOp: text('price_op', { enum: ['lt', 'lte', 'gt', 'gte'] }),
     priceThreshold: numeric('price_threshold'),
+    params: jsonb('params').notNull().default({}),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastFiredAt: timestamp('last_fired_at', { withTimezone: true }),
