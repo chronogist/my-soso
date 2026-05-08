@@ -1,5 +1,5 @@
-import { DashboardShell } from '../components/dashboard-shell';
+import { EntryPicker } from '../components/entry-picker';
 
 export default function Home() {
-  return <DashboardShell />;
+  return <EntryPicker />;
 }
