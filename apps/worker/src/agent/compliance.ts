@@ -1,7 +1,7 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateObject, type LanguageModel } from 'ai';
+import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { Logger } from 'pino';
+import { createOpenRouterModel } from './openrouter.js';
 
 export const AuditClassificationSchema = z.enum([
   'market_info',
@@ -15,11 +15,7 @@ export type AuditClassification = z.infer<typeof AuditClassificationSchema>;
 
 const ClassificationResultSchema = z.object({
   classification: AuditClassificationSchema,
-  rationale: z
-    .string()
-    .min(1)
-    .max(160)
-    .describe('Short reason for the classification.'),
+  rationale: z.string().min(1).max(160).describe('Short reason for the classification.'),
 });
 
 const SYSTEM_PROMPT = `You classify outbound crypto assistant replies for compliance review.
@@ -39,7 +35,7 @@ const FALLBACK_RESPONSE =
   "I can help explain what's moving the market, compare assets, and outline risks, but I can't tell you what to buy, sell, or how to size a trade. Ask me about catalysts, momentum, or risks for a specific asset and I'll keep it analytical.";
 
 export interface ComplianceDeps {
-  anthropicApiKey: string;
+  openRouterApiKey: string;
   model?: string;
   log: Logger;
 }
@@ -62,9 +58,10 @@ export interface ComplianceClassifier {
 }
 
 export function createComplianceClassifier(deps: ComplianceDeps): ComplianceClassifier {
-  const anthropic = createAnthropic({ apiKey: deps.anthropicApiKey });
-  const modelId = deps.model ?? 'claude-haiku-4-5-20251001';
-  const model = anthropic(modelId) as LanguageModel;
+  const { model } = createOpenRouterModel({
+    apiKey: deps.openRouterApiKey,
+    model: deps.model,
+  });
 
   return {
     review: async ({ userMessage, assistantReply, conversationId }) => {
@@ -72,7 +69,9 @@ export function createComplianceClassifier(deps: ComplianceDeps): ComplianceClas
         const { object } = await generateObject({
           model,
           system: SYSTEM_PROMPT,
-          prompt: [`User message: ${userMessage}`, `Assistant reply: ${assistantReply}`].join('\n\n'),
+          prompt: [`User message: ${userMessage}`, `Assistant reply: ${assistantReply}`].join(
+            '\n\n',
+          ),
           schema: ClassificationResultSchema,
           maxOutputTokens: 120,
           headers: { 'x-conversation-id': `${conversationId}:compliance` },

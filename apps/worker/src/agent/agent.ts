@@ -1,10 +1,10 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, stepCountIs, type LanguageModel } from 'ai';
 import type { Logger } from 'pino';
 import type { MarketDataProvider, NewsProvider } from '@my-soso/providers';
 import type { Database } from '@my-soso/db';
 import { buildAgentTools } from './tools.js';
 import { SYSTEM_PROMPT } from './system-prompt.js';
+import { createOpenRouterModel } from './openrouter.js';
 
 export interface AgentDeps {
   market: MarketDataProvider;
@@ -12,8 +12,8 @@ export interface AgentDeps {
   /** Database handle. Tools that mutate user state use this with withTenantUser. */
   db: Database;
   log: Logger;
-  anthropicApiKey: string;
-  /** Anthropic model id. Default: claude-haiku-4-5-20251001. */
+  openRouterApiKey: string;
+  /** OpenRouter model id. Default: openai/gpt-4o-mini. */
   model?: string;
   /** Maximum tool-use steps before forcing a final answer. Default 4. */
   maxSteps?: number;
@@ -41,8 +41,10 @@ export interface Agent {
 }
 
 export function createAgent(deps: AgentDeps): Agent {
-  const anthropic = createAnthropic({ apiKey: deps.anthropicApiKey });
-  const model = anthropic(deps.model ?? 'claude-haiku-4-5-20251001') as LanguageModel;
+  const { model } = createOpenRouterModel({
+    apiKey: deps.openRouterApiKey,
+    model: deps.model,
+  }) as { model: LanguageModel };
   const maxSteps = deps.maxSteps ?? 4;
   const maxOutputTokens = deps.maxOutputTokens ?? 600;
 
@@ -64,7 +66,7 @@ export function createAgent(deps: AgentDeps): Agent {
         tools,
         stopWhen: stepCountIs(maxSteps),
         maxOutputTokens,
-        // Pass conversation id through so Anthropic logs / Sentry traces
+        // Pass conversation id through so provider logs / Sentry traces
         // can be correlated to a chat thread without leaking user PII.
         headers: { 'x-conversation-id': conversationId },
       });

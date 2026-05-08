@@ -31,7 +31,7 @@ function main() {
     agent: stack.agent,
     compliance: stack.compliance,
     db: stack.db,
-    agentModelId: config.ANTHROPIC_MODEL,
+    agentModelId: config.OPENROUTER_MODEL,
   });
   const outbound = startOutboundConsumer({
     connection,
@@ -83,8 +83,8 @@ function main() {
       log,
       db: stack.db,
       market: stack.provider,
-      anthropicApiKey: config.ANTHROPIC_API_KEY,
-      model: config.ANTHROPIC_MODEL,
+      openRouterApiKey: config.OPENROUTER_API_KEY,
+      model: config.OPENROUTER_MODEL,
       intervalMs: config.DIGEST_INTERVAL_MS,
       dailyHourUtc: config.DIGEST_DAILY_HOUR_UTC,
       weeklyDowUtc: config.DIGEST_WEEKLY_DOW_UTC,

@@ -1,4 +1,3 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, type LanguageModel } from 'ai';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import {
@@ -14,13 +13,14 @@ import { schema, withServiceContext, withTenantUser, type Database } from '@my-s
 import { RateLimitedError, type MarketDataProvider, type Price } from '@my-soso/providers';
 import type { Logger } from 'pino';
 import { withSentry } from '../sentry.js';
+import { createOpenRouterModel } from '../agent/openrouter.js';
 
 /**
  * Daily and weekly digest. Runs hourly; per tick, finds the
  * (channel-linked) users whose schedule matches the current period
  * and who have not yet received this period's digest. Builds the
  * digest from cache (prices for watchlist symbols + recent
- * news_extractions intersecting the watchlist) and writes one Claude
+ * news_extractions intersecting the watchlist) and writes one model
  * call per user to synthesise the prose.
  *
  * Dedup is per (user, schedule, period_key) via the unique index on
@@ -29,7 +29,7 @@ import { withSentry } from '../sentry.js';
  * not after, so a crashed run does not leave a user without their
  * digest for the day.
  *
- * Cost: 1 Claude call per opted-in user per period. With 100 users on
+ * Cost: 1 model call per opted-in user per period. With 100 users on
  * daily that's 100 calls/day, ~30k/month — well inside any plan.
  */
 
@@ -42,8 +42,8 @@ export interface DigestOptions {
   log: Logger;
   db: Database;
   market: MarketDataProvider;
-  anthropicApiKey: string;
-  /** Anthropic model for digest synthesis. Default haiku. */
+  openRouterApiKey: string;
+  /** OpenRouter model for digest synthesis. Default gpt-4o-mini. */
   model?: string;
   /** Tick cadence ms. Default 1h. */
   intervalMs?: number;
@@ -72,9 +72,11 @@ export function startDigest(opts: DigestOptions): DigestHandles {
 
   const queue = createQueue<DigestTick>(queueName, opts.connection);
   const outbound = createQueue<OutboundJob>(QueueNames.outbound, opts.connection);
-  const anthropic = createAnthropic({ apiKey: opts.anthropicApiKey });
-  const modelId = opts.model ?? 'claude-haiku-4-5-20251001';
-  const model = anthropic(modelId) as LanguageModel;
+  const openRouter = createOpenRouterModel({
+    apiKey: opts.openRouterApiKey,
+    model: opts.model,
+  });
+  const { modelId, model } = openRouter;
 
   void queue.removeJobScheduler(REPEAT_KEY).catch(() => undefined);
   void queue.upsertJobScheduler(

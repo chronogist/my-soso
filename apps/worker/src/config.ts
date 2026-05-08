@@ -19,9 +19,9 @@ const ConfigSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: optionalString(),
   WHATSAPP_PHONE_NUMBER_ID: optionalString(),
 
-  // Phase 3: SoSoValue + Anthropic agent.
-  ANTHROPIC_API_KEY: z.string().min(1),
-  ANTHROPIC_MODEL: z.string().min(1).default('claude-haiku-4-5-20251001'),
+  // Phase 3: SoSoValue + OpenRouter-backed agent.
+  OPENROUTER_API_KEY: z.string().min(1),
+  OPENROUTER_MODEL: z.string().min(1).default('openai/gpt-4o-mini'),
   SOSOVALUE_API_KEY: z.string().min(1),
   SOSOVALUE_BASE_URL: z.string().url().optional(),
   /** Per-minute call cap for SoSoValue. Demo plan documents 10 rpm; we leave

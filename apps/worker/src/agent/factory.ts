@@ -12,10 +12,7 @@ import { createDb, type Database } from '@my-soso/db';
 import type { Logger } from 'pino';
 import type { Config } from '../config.js';
 import { createAgent, type Agent } from './agent.js';
-import {
-  createComplianceClassifier,
-  type ComplianceClassifier,
-} from './compliance.js';
+import { createComplianceClassifier, type ComplianceClassifier } from './compliance.js';
 import { createNewsExtractor, type NewsExtractor } from './news-extractor.js';
 
 export interface AgentStack {
@@ -95,21 +92,21 @@ export function buildAgentStack({
     news: provider,
     db,
     log,
-    anthropicApiKey: config.ANTHROPIC_API_KEY,
-    model: config.ANTHROPIC_MODEL,
+    openRouterApiKey: config.OPENROUTER_API_KEY,
+    model: config.OPENROUTER_MODEL,
   });
 
   const compliance = createComplianceClassifier({
-    anthropicApiKey: config.ANTHROPIC_API_KEY,
-    model: config.ANTHROPIC_MODEL,
+    openRouterApiKey: config.OPENROUTER_API_KEY,
+    model: config.OPENROUTER_MODEL,
     log,
   });
 
   const newsExtractor = createNewsExtractor({
     db,
     log,
-    anthropicApiKey: config.ANTHROPIC_API_KEY,
-    model: config.ANTHROPIC_MODEL,
+    openRouterApiKey: config.OPENROUTER_API_KEY,
+    model: config.OPENROUTER_MODEL,
   });
 
   return {

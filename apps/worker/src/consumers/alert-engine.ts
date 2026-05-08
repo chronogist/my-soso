@@ -18,7 +18,7 @@ import { withSentry } from '../sentry.js';
  * every active alert against the warm cache and persists deliveries
  * with a dedup constraint, then enqueues outbound replies.
  *
- * Cost discipline: this engine NEVER calls Claude. News alerts are
+ * Cost discipline: this engine NEVER calls the model. News alerts are
  * a SQL filter on news_extractions.affected_assets (populated by the
  * separate news-extractor that runs once per article). Price alerts
  * are a per-symbol cache hit followed by a JS comparison. So an alert
