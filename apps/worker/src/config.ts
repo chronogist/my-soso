@@ -1,15 +1,23 @@
 import { z } from 'zod';
 
+// Treat empty-string env vars as missing — devs commonly leave optional
+// keys defined-but-blank in .env, and zod's .url()/.min(1) would otherwise
+// reject the whole config at boot.
+const optionalString = () =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional());
+const optionalUrl = () =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+
 const ConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
-  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_DSN: optionalUrl(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_BOT_TOKEN: z.string().min(1),
-  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+  WHATSAPP_ACCESS_TOKEN: optionalString(),
+  WHATSAPP_PHONE_NUMBER_ID: optionalString(),
 
   // Phase 3: SoSoValue + Anthropic agent.
   ANTHROPIC_API_KEY: z.string().min(1),
