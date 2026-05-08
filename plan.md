@@ -63,7 +63,7 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now par
 - [x] Prefetcher singleton (BullMQ repeatable job) — top currencies/news/indices/ETF
 - [x] Monthly budget tracker (`provider_usage_budgets` table)
 - [x] Per-minute SoSoValue token bucket (6/min)
-- [x] Anthropic Claude wired into Worker via Vercel AI SDK
+- [x] LLM agent wired into Worker via Vercel AI SDK (OpenRouter-backed, model-agnostic)
 - [x] First two tools: `getPrice`, `getNewsForAsset`
 - [x] Replace echo fallback in inbound consumer with real agent
 - [x] Cache hit rate metric
@@ -133,14 +133,14 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now par
 
 3. **Close the production-readiness gaps**
    - Approve WhatsApp templates: `digest`, `alert`, `link-confirmation`.
-   - Resolve the worker-side `drizzle-orm` type/version mismatch so the repo is back to a clean compile.
+   - Wire worker-side enforcement of `users.preferences` (bot personality, news filter, quiet hours, throttling, coverage, per-channel overrides) into the agent / alert engine / digest paths.
    - Produce the demo flow and submission writeup.
 
 ## How to resume
 
 1. `pnpm install`
-2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus Sentry optional.
-3. `pnpm db:migrate` to apply the SQL migrations to Supabase.
+2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`), `SOSOVALUE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus Sentry optional.
+3. `pnpm --filter @my-soso/db exec tsx scripts/apply-migrations.ts` to apply the SQL migrations to Supabase (idempotent; tracked via `__migrations`).
 4. `pnpm dev:dashboard`, `pnpm dev:api`, `pnpm dev:edge`, and `pnpm dev:worker` in separate terminals.
 5. Open the dashboard, choose a platform, and use the `/setup` flow to generate a link code.
 6. Expose Edge publicly and register the appropriate webhook / interactions endpoint for Telegram, Discord, and WhatsApp.
