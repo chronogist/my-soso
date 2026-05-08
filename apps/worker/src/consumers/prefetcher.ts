@@ -157,6 +157,6 @@ export function startPrefetcher(opts: PrefetcherOptions): PrefetcherHandles {
 }
 
 function describeErr(err: unknown): string {
-  if (err instanceof Error) return err.name;
+  if (err instanceof Error) return `${err.name}: ${err.message}`;
   return 'unknown';
 }
