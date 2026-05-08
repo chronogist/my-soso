@@ -37,6 +37,8 @@ function main() {
     connection,
     log,
     telegramBotToken: config.TELEGRAM_BOT_TOKEN,
+    whatsappAccessToken: config.WHATSAPP_ACCESS_TOKEN,
+    whatsappPhoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
   });
 
   const consumers: Shutdownable[] = [inbound, outbound, stack];

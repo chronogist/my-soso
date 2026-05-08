@@ -1,4 +1,4 @@
-import { discord, telegram } from '@my-soso/channels';
+import { discord, telegram, whatsapp } from '@my-soso/channels';
 import {
   createWorker,
   OutboundJobSchema,
@@ -19,6 +19,8 @@ export interface StartOutboundConsumerOptions {
   connection: Redis;
   log: Logger;
   telegramBotToken: string;
+  whatsappAccessToken?: string;
+  whatsappPhoneNumberId?: string;
 }
 
 /**
@@ -31,6 +33,8 @@ export function startOutboundConsumer({
   connection,
   log,
   telegramBotToken,
+  whatsappAccessToken,
+  whatsappPhoneNumberId,
 }: StartOutboundConsumerOptions): OutboundConsumerHandles {
   const worker = createWorker<OutboundJob, void>({
     name: QueueNames.outbound,
@@ -80,8 +84,25 @@ export function startOutboundConsumer({
               return;
             }
           case 'whatsapp':
-            log.warn({ channel: out.channel }, 'channel adapter not yet implemented');
-            return;
+            if (!whatsappAccessToken || !whatsappPhoneNumberId) {
+              log.error({ jobId: job.id }, 'whatsapp config missing');
+              throw new Error('whatsapp config missing');
+            }
+            {
+              const result = await whatsapp.sendWhatsAppMessage({
+                accessToken: whatsappAccessToken,
+                phoneNumberId: whatsappPhoneNumberId,
+                to: out.externalUserId,
+                text: out.text,
+                templateName: out.whatsappTemplate,
+              });
+              if (!result.ok) {
+                log.error({ jobId: job.id, description: result.description }, 'whatsapp send failed');
+                throw new Error(result.description);
+              }
+              log.info({ jobId: job.id }, 'whatsapp send ok');
+              return;
+            }
         }
       }),
   });

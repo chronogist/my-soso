@@ -8,6 +8,8 @@ const ConfigSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_BOT_TOKEN: z.string().min(1),
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
 
   // Phase 3: SoSoValue + Anthropic agent.
   ANTHROPIC_API_KEY: z.string().min(1),
