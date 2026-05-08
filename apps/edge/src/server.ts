@@ -4,6 +4,7 @@ import { buildLoggerOptions } from './logger.js';
 import { Sentry } from './sentry.js';
 import { registerDiscordWebhook } from './routes/discord.js';
 import { registerTelegramWebhook } from './routes/telegram.js';
+import { registerWhatsAppWebhook } from './routes/whatsapp.js';
 
 export function buildServer(config: Config): FastifyInstance {
   const app = Fastify({
@@ -30,6 +31,7 @@ export function buildServer(config: Config): FastifyInstance {
 
   registerTelegramWebhook(app, config);
   registerDiscordWebhook(app, config);
+  registerWhatsAppWebhook(app, config);
 
   return app;
 }

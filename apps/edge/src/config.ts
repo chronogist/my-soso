@@ -10,6 +10,8 @@ const ConfigSchema = z.object({
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1),
   DISCORD_PUBLIC_KEY: z.string().min(1).optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
