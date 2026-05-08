@@ -9,8 +9,49 @@ export interface ApiUser {
 }
 
 export type DigestSchedule = 'off' | 'daily' | 'weekly';
-export type AlertKind = 'price' | 'news';
+export type AlertKind = 'price' | 'news' | 'etf_flow' | 'index_move' | 'sentiment' | 'macro';
 export type PriceOp = 'lt' | 'lte' | 'gt' | 'gte';
+export type Tone = 'concise' | 'detailed' | 'casual' | 'formal';
+export type Verbosity = 'short' | 'normal' | 'long';
+export type NewsStrength = 'major_only' | 'portfolio' | 'all';
+
+export interface BotPreferences {
+  tone: Tone;
+  verbosity: Verbosity;
+  language: string;
+  timezone: string;
+  digestTime: string;
+  digestWeekday: number;
+  digestSections: ('prices' | 'news' | 'etf_flows' | 'indices' | 'macro')[];
+  quietHours: { enabled: boolean; start: string; end: string };
+  throttling: { maxPerHour: number; maxPerDay: number };
+  newsFilter: {
+    strength: NewsStrength;
+    sources: ('hot' | 'featured' | 'search')[];
+    explainImpact: boolean;
+  };
+  coverage: {
+    currencies: boolean;
+    etfs: boolean;
+    ssiIndices: boolean;
+    cryptoStocks: boolean;
+    btcTreasuries: boolean;
+    fundraising: boolean;
+    macro: boolean;
+  };
+  formatting: {
+    includeCharts: boolean;
+    includeLinks: boolean;
+    includeCitations: boolean;
+    memoCommandEnabled: boolean;
+  };
+  channelOverrides: Partial<
+    Record<
+      'telegram' | 'discord' | 'whatsapp',
+      { enabled?: boolean; tone?: Tone; muteAlerts?: boolean }
+    >
+  >;
+}
 
 export interface ChannelLink {
   id: string;
@@ -48,6 +89,7 @@ export interface Alert {
   assetKind: string;
   priceOp: PriceOp | null;
   priceThreshold: number | null;
+  params: Record<string, unknown>;
   active: boolean;
   createdAt: string;
   lastFiredAt: string | null;
