@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./telegram": "./src/telegram/index.ts",
-    "./discord": "./src/discord/index.ts"
+    "./discord": "./src/discord/index.ts",
+    "./whatsapp": "./src/whatsapp/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -b",
