@@ -77,7 +77,10 @@ export function startOutboundConsumer({
                 text: out.text,
               });
               if (!result.ok) {
-                log.error({ jobId: job.id, description: result.description }, 'discord send failed');
+                log.error(
+                  { jobId: job.id, description: result.description },
+                  'discord send failed',
+                );
                 throw new Error(result.description);
               }
               log.info({ jobId: job.id }, 'discord send ok');
@@ -89,15 +92,20 @@ export function startOutboundConsumer({
               throw new Error('whatsapp config missing');
             }
             {
+              const template =
+                out.whatsappTemplate === undefined ? {} : { templateName: out.whatsappTemplate };
               const result = await whatsapp.sendWhatsAppMessage({
                 accessToken: whatsappAccessToken,
                 phoneNumberId: whatsappPhoneNumberId,
                 to: out.externalUserId,
                 text: out.text,
-                templateName: out.whatsappTemplate,
+                ...template,
               });
               if (!result.ok) {
-                log.error({ jobId: job.id, description: result.description }, 'whatsapp send failed');
+                log.error(
+                  { jobId: job.id, description: result.description },
+                  'whatsapp send failed',
+                );
                 throw new Error(result.description);
               }
               log.info({ jobId: job.id }, 'whatsapp send ok');
