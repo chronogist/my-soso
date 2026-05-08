@@ -94,6 +94,18 @@ const commands = [
       },
     ],
   },
+  {
+    name: 'memo',
+    description: 'Generate a short market memo from your watchlist and recent news',
+    options: [
+      {
+        type: 3,
+        name: 'prompt',
+        description: 'Optional focus, for example BTC and ETH this week',
+        required: false,
+      },
+    ],
+  },
 ];
 
 const route = guildId

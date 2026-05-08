@@ -70,8 +70,12 @@ export function slashCommandText(interaction: DiscordInteraction): string | null
       const code = options.find((option) => option.name === 'code')?.value;
       return typeof code === 'string' ? `/link ${code.trim()}` : null;
     }
-    case 'memo':
-      return `/${command}`;
+    case 'memo': {
+      const prompt = options.find((option) => option.name === 'prompt')?.value;
+      return typeof prompt === 'string' && prompt.trim()
+        ? `Write a concise market memo: ${prompt.trim()}`
+        : 'Write a concise market memo for my watchlist. Cover the most important price moves, news, and what to watch next. Do not recommend trades.';
+    }
     default:
       return null;
   }

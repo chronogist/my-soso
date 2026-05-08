@@ -35,7 +35,9 @@ export default tseslint.config(
             'apps/*/*.config.ts',
             'apps/*/*.config.js',
             'apps/*/scripts/*.ts',
+            'apps/*/scripts/*.js',
             'packages/*/scripts/*.ts',
+            'packages/*/scripts/*.js',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
@@ -69,6 +71,17 @@ export default tseslint.config(
   {
     files: ['**/*.config.{js,ts,mjs}'],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ['**/scripts/*.{js,mjs}'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
   },
   {
     files: ['**/next-env.d.ts'],

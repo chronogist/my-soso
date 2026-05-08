@@ -114,22 +114,35 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
       });
     }
 
-    if (commandName !== 'ask' && commandName !== 'link' && commandName !== 'watch' && commandName !== 'alert') {
+    if (
+      commandName !== 'ask' &&
+      commandName !== 'link' &&
+      commandName !== 'watch' &&
+      commandName !== 'alert' &&
+      commandName !== 'memo'
+    ) {
       return reply.status(200).send({
         type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: `/${commandName} is not wired yet. /ask, /watch, /alert, and /link are live first.` },
+        data: {
+          content: `/${commandName} is not wired yet. /ask, /watch, /alert, /memo, and /link are live first.`,
+        },
       });
     }
 
     if (commandName === 'link') {
-      const linkCode = /^\/link\s+([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/i.exec(text)?.[1]?.toUpperCase();
+      const linkCode = /^\/link\s+([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/i
+        .exec(text)?.[1]
+        ?.toUpperCase();
       const raw = linkCode ? await connection.getdel(`link_code:${linkCode}`) : null;
       const linkPayload = parseLinkPayload(raw);
 
       if (!linkPayload?.success || linkPayload.data.channel !== 'discord') {
         return reply.status(200).send({
           type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: 'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.' },
+          data: {
+            content:
+              'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
+          },
         });
       }
 
@@ -161,7 +174,9 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
       req.log.info({ userId: linkPayload.data.userId }, 'discord account linked');
       return reply.status(200).send({
         type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: 'Discord is linked. Your My-Soso agent now knows this account belongs to you.' },
+        data: {
+          content: 'Discord is linked. Your My-Soso agent now knows this account belongs to you.',
+        },
       });
     }
 

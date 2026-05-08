@@ -25,7 +25,8 @@ const COMMANDS: Record<string, (job: InboundJob) => CommandReply> = {
       '• "How is BTC doing?"\n' +
       '• "Any major Solana news?"\n' +
       '• "Set an alert for ETH dropping below 3000"\n' +
-      '• "Give me a one-pager on Hyperliquid"',
+      '• "Give me a one-pager on Hyperliquid"\n' +
+      '• "/memo" for a concise watchlist market memo',
   }),
 };
 
