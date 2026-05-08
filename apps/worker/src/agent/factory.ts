@@ -12,10 +12,15 @@ import { createDb, type Database } from '@my-soso/db';
 import type { Logger } from 'pino';
 import type { Config } from '../config.js';
 import { createAgent, type Agent } from './agent.js';
+import {
+  createComplianceClassifier,
+  type ComplianceClassifier,
+} from './compliance.js';
 import { createNewsExtractor, type NewsExtractor } from './news-extractor.js';
 
 export interface AgentStack {
   agent: Agent;
+  compliance: ComplianceClassifier;
   /** Composed provider, exported so the prefetcher can warm it. */
   provider: MarketDataProvider & NewsProvider;
   /** Cache hit-rate counters; periodically logged for observability. */
@@ -94,6 +99,12 @@ export function buildAgentStack({
     model: config.ANTHROPIC_MODEL,
   });
 
+  const compliance = createComplianceClassifier({
+    anthropicApiKey: config.ANTHROPIC_API_KEY,
+    model: config.ANTHROPIC_MODEL,
+    log,
+  });
+
   const newsExtractor = createNewsExtractor({
     db,
     log,
@@ -103,6 +114,7 @@ export function buildAgentStack({
 
   return {
     agent,
+    compliance,
     provider,
     cacheCounters: counters,
     budget,

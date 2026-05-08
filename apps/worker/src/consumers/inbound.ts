@@ -17,8 +17,12 @@ import {
 import type { Logger } from 'pino';
 import type { Database } from '@my-soso/db';
 import { handleCommand } from '../commands.js';
-import type { Agent } from '../agent/agent.js';
+import type { Agent, RunAgentResult } from '../agent/agent.js';
 import { writeAuditEntry } from '../agent/audit.js';
+import type {
+  AuditClassification,
+  ComplianceClassifier,
+} from '../agent/compliance.js';
 import { withSentry } from '../sentry.js';
 
 export interface InboundConsumerHandles {
@@ -60,12 +64,14 @@ export function startInboundConsumer({
   connection,
   log,
   agent,
+  compliance,
   db,
   agentModelId,
 }: {
   connection: Redis;
   log: Logger;
   agent: Agent;
+  compliance: ComplianceClassifier;
   db: Database;
   agentModelId: string;
 }): InboundConsumerHandles {
@@ -127,6 +133,8 @@ export function startInboundConsumer({
 
             const command = handleCommand(inbound);
             let replyText: string;
+            let classification: AuditClassification = 'market_info';
+            let auditedResult: RunAgentResult | undefined;
             if (command) {
               replyText = command.text;
             } else {
@@ -136,8 +144,18 @@ export function startInboundConsumer({
                   conversationId: inbound.conversationId,
                   userId: inbound.userId,
                 });
-                replyText = result.text;
-                await writeAuditEntry({ db, log, inbound, modelId: agentModelId, result });
+                const review = await compliance.review({
+                  userMessage: inbound.text,
+                  assistantReply: result.text,
+                  conversationId: inbound.conversationId,
+                });
+                replyText = review.responseText;
+                classification = review.classification;
+                auditedResult = {
+                  ...result,
+                  text: replyText,
+                  finishReason: review.sanitized ? 'compliance_rewrite' : result.finishReason,
+                };
               } catch (err) {
                 // Agent failures must not block the FIFO sequence. Reply with
                 // an honest apology and advance the seqNo so the next user
@@ -178,6 +196,17 @@ export function startInboundConsumer({
             };
 
             await outboundQueue.add('outbound', outbound, { jobId: outbound.idempotencyKey });
+
+            if (auditedResult) {
+              await writeAuditEntry({
+                db,
+                log,
+                inbound,
+                modelId: agentModelId,
+                result: auditedResult,
+                classification,
+              });
+            }
 
             // Advance the processed counter ATOMICALLY only if it's still
             // exactly `lastSeq + 1`. If a parallel worker somehow advanced

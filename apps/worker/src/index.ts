@@ -29,6 +29,7 @@ function main() {
     connection,
     log,
     agent: stack.agent,
+    compliance: stack.compliance,
     db: stack.db,
     agentModelId: config.ANTHROPIC_MODEL,
   });

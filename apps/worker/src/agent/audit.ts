@@ -2,6 +2,7 @@ import { schema, withServiceContext, type Database } from '@my-soso/db';
 import type { Logger } from 'pino';
 import type { InboundJob } from '@my-soso/queue';
 import type { RunAgentResult } from './agent.js';
+import type { AuditClassification } from './compliance.js';
 
 /**
  * Persists every agent response to agent_audit_log for compliance
@@ -21,6 +22,7 @@ export async function writeAuditEntry({
   modelId,
   result,
   errorMessage,
+  classification = 'market_info',
 }: {
   db: Database;
   log: Logger;
@@ -30,6 +32,7 @@ export async function writeAuditEntry({
   result?: RunAgentResult;
   /** Set when the agent threw before producing a reply. */
   errorMessage?: string;
+  classification?: AuditClassification;
 }): Promise<void> {
   // Audit must never block the user-facing reply. Wrap in try/catch
   // so a transient db error logs once and moves on.
@@ -44,7 +47,7 @@ export async function writeAuditEntry({
           channel: inbound.channel,
           userMessage: inbound.text,
           responseText: result?.text ?? errorMessage ?? '',
-          classification: 'market_info',
+          classification,
           model: modelId,
           stepCount: result?.steps ?? 0,
           totalTokens: result?.totalTokens ?? null,
