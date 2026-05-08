@@ -655,6 +655,16 @@ h2 {
   color: #f5b427;
 }
 
+.entry__protocol-icon--whatsapp {
+  background: linear-gradient(180deg, rgba(37, 211, 102, 0.18), rgba(37, 211, 102, 0.06));
+  color: #25d366;
+}
+
+.entry__protocol-icon--discord {
+  background: linear-gradient(180deg, rgba(88, 101, 242, 0.2), rgba(88, 101, 242, 0.08));
+  color: #8a92ff;
+}
+
 .entry__protocol-text {
   display: flex;
   flex-direction: column;
