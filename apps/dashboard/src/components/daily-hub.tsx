@@ -91,6 +91,7 @@ export function DailyHub() {
     savePreferences,
     error,
     isPending,
+    initialLoaded,
     addWatchlistItem,
     removeWatchlistItem,
     createAlert,
@@ -103,14 +104,21 @@ export function DailyHub() {
 
   const [tab, setTab] = useState<Tab>('overview');
 
-  if (!ready || !authenticated || !chosenChannel) {
+  if (!ready || !authenticated || !chosenChannel || !initialLoaded) {
     return (
       <main className="entry">
         <div className="entry__brand">
           <span className="entry__brand-dot" />
           MySoSo
         </div>
-        <section className="entry__card entry__card--loading">Loading your hub…</section>
+        <section className="entry__card entry__card--loading">
+          <span className="entry__loading-dots" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </span>
+          Loading your hub…
+        </section>
       </main>
     );
   }

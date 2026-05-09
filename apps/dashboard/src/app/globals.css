@@ -513,6 +513,44 @@ h2 {
   text-align: center;
   color: rgba(235, 235, 232, 0.6);
   font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.entry__loading-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.entry__loading-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f5b427;
+  box-shadow: 0 0 10px rgba(245, 180, 39, 0.7);
+  animation: entryDotPulse 1s ease-in-out infinite;
+}
+
+.entry__loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.entry__loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes entryDotPulse {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .entry__eyebrow {

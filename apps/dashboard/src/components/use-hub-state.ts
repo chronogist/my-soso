@@ -132,6 +132,10 @@ export function useHubState(options?: { pollForLink?: boolean }) {
   const [preferences, setPreferences] = useState<BotPreferences>(DEFAULT_PREFERENCES);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Distinct from isPending (which fires on every transition). This flips
+  // true exactly once after the first refreshAll resolves, so consumers can
+  // hold the UI on a loading shell until we know whether the user is linked.
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -140,7 +144,9 @@ export function useHubState(options?: { pollForLink?: boolean }) {
       return;
     }
     startTransition(() => {
-      void refreshAll().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      void refreshAll()
+        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setInitialLoaded(true));
     });
   }, [ready, authenticated, chosenChannel, router]);
 
@@ -341,6 +347,7 @@ export function useHubState(options?: { pollForLink?: boolean }) {
     savePreferences,
     error,
     isPending,
+    initialLoaded,
     refreshAll,
     generateLinkCode,
     addWatchlistItem,

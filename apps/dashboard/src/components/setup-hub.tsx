@@ -22,19 +22,30 @@ export function SetupHub() {
     linkCode,
     error,
     isPending,
+    initialLoaded,
     generateLinkCode,
     changePlatform,
     signOut,
   } = useHubState({ pollForLink: true });
 
-  if (!ready || !authenticated || !chosenChannel) {
+  // Gate the page on initialLoaded so users who are already linked never
+  // see a "NOT LINKED / Generate Link Code" flash while /v1/channel-links
+  // is in flight. Same shell for both pre-auth and post-auth-pre-fetch.
+  if (!ready || !authenticated || !chosenChannel || !initialLoaded) {
     return (
       <main className="entry">
         <div className="entry__brand">
           <span className="entry__brand-dot" />
           MySoSo
         </div>
-        <section className="entry__card entry__card--loading">Loading onboarding…</section>
+        <section className="entry__card entry__card--loading">
+          <span className="entry__loading-dots" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </span>
+          Checking your link status…
+        </section>
       </main>
     );
   }
