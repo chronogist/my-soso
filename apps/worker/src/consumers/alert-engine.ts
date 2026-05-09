@@ -333,7 +333,12 @@ function shouldSuppressAlert(
   channel: 'telegram' | 'discord' | 'whatsapp',
   now: Date,
 ): boolean {
-  if (prefs.channelOverrides?.[channel]?.muteAlerts) return true;
+  const override = prefs.channelOverrides?.[channel];
+  // `enabled: false` is an explicit user toggle to pause the channel
+  // entirely for unsolicited pushes — distinct from muteAlerts which
+  // pauses only alerts. Both behave identically here.
+  if (override?.enabled === false) return true;
+  if (override?.muteAlerts) return true;
   if (isInQuietHours(prefs, now)) return true;
   return false;
 }

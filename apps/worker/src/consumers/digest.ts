@@ -238,14 +238,15 @@ async function sendDigest(args: SendDigestArgs): Promise<void> {
   // error.
   const prefs = await loadUserPreferences(args.db, args.userId);
 
-  // Per-channel override: a channel can be muted explicitly while still
-  // subscribed to a digest schedule. Treat the same as "skip this send"
-  // — the deliveries row was already claimed so we won't try again
-  // until the next period.
-  if (prefs.channelOverrides?.[args.channel]?.muteAlerts) {
+  // Per-channel override: a channel can be paused (enabled: false) or
+  // muted (muteAlerts: true) while still subscribed to a digest
+  // schedule. Either silences this send. The deliveries row was already
+  // claimed so we won't try again until the next period.
+  const channelOverride = prefs.channelOverrides?.[args.channel];
+  if (channelOverride?.enabled === false || channelOverride?.muteAlerts) {
     args.log.info(
       { userId: args.userId, schedule: args.schedule, channel: args.channel },
-      'digest skipped: channel muted by user',
+      'digest skipped: channel paused or muted by user',
     );
     return;
   }
