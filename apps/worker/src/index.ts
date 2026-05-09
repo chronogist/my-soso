@@ -32,6 +32,7 @@ function main() {
     compliance: stack.compliance,
     db: stack.db,
     agentModelId: config.OPENROUTER_MODEL,
+    telegramBotToken: config.TELEGRAM_BOT_TOKEN,
   });
   const outbound = startOutboundConsumer({
     connection,

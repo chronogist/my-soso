@@ -51,3 +51,44 @@ export async function sendTelegramMessage(
   const messageId = json.result?.message_id;
   return messageId === undefined ? { ok: true } : { ok: true, message_id: messageId };
 }
+
+export interface TelegramChatActionOptions {
+  botToken: string;
+  chatId: string | number;
+  /** Default 'typing'. Telegram supports several but typing is what we
+   * want for "agent is composing a reply". */
+  action?:
+    | 'typing'
+    | 'upload_photo'
+    | 'record_video'
+    | 'upload_video'
+    | 'record_voice'
+    | 'upload_voice'
+    | 'upload_document'
+    | 'choose_sticker'
+    | 'find_location'
+    | 'record_video_note'
+    | 'upload_video_note';
+}
+
+/**
+ * Show the Telegram "typing…" indicator in a chat. The indicator
+ * auto-clears after ~5 seconds — for longer agent runs the caller
+ * should re-fire periodically. Failures are silent (the indicator is
+ * cosmetic and a missing one must never block message delivery).
+ */
+export async function sendTelegramChatAction(opts: TelegramChatActionOptions): Promise<void> {
+  const url = `${TELEGRAM_API}/bot${opts.botToken}/sendChatAction`;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: opts.chatId,
+        action: opts.action ?? 'typing',
+      }),
+    });
+  } catch {
+    // Cosmetic only — swallow network errors so the agent path is unaffected.
+  }
+}
