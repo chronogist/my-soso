@@ -12,7 +12,12 @@ import { RateLimitedError, UnknownSymbolError, type MarketDataProvider } from '@
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { withSentry } from '../sentry.js';
-import { isInQuietHours, loadUserPreferencesBatch, type BotPreferences } from '../preferences.js';
+import {
+  isInQuietHours,
+  loadUserPreferencesBatch,
+  recordAndCheckPushQuota,
+  type BotPreferences,
+} from '../preferences.js';
 
 /**
  * Alert engine: a singleton repeatable BullMQ job that evaluates
@@ -90,7 +95,14 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
     processor: () =>
       withSentry('alert-engine', async () => {
         const startedAt = Date.now();
-        const stats = { evaluated: 0, fired: 0, deliveriesSent: 0, suppressed: 0, errors: 0 };
+        const stats = {
+          evaluated: 0,
+          fired: 0,
+          deliveriesSent: 0,
+          suppressed: 0,
+          throttled: 0,
+          errors: 0,
+        };
 
         const cooldownThreshold = new Date(Date.now() - cooldownMs);
         const newsCutoff = new Date(Date.now() - newsLookbackMs);
@@ -195,6 +207,18 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
           if (prefs && shouldSuppressAlert(prefs, link.channel, tickNow)) {
             stats.suppressed++;
             continue;
+          }
+
+          // Throttling: enforce per-user maxPerHour / maxPerDay caps so
+          // a noisy market cannot flood the user. Quota is only consumed
+          // on successful claim, so suppressed alerts here also keep
+          // their quota unused.
+          if (prefs) {
+            const allowed = await recordAndCheckPushQuota(opts.connection, alert.userId, prefs);
+            if (!allowed) {
+              stats.throttled++;
+              continue;
+            }
           }
 
           if (alert.kind === 'price') {

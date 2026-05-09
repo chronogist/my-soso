@@ -1,5 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import { schema, type Database } from '@my-soso/db';
+import type { Redis } from '@my-soso/queue';
 import { z } from 'zod';
 
 /**
@@ -185,6 +186,72 @@ export function isInQuietHours(prefs: BotPreferences, now: Date = new Date()): b
   // Window wraps midnight: e.g. 22:00 → 07:00 covers >=22:00 OR <07:00.
   return nowMinutes >= startMinutes || nowMinutes < endMinutes;
 }
+
+/**
+ * Atomically check + increment per-user push counters against the
+ * user's hour/day caps. Used to throttle unsolicited pushes (alerts,
+ * digests) so the bot does not flood a user during a noisy market.
+ *
+ * Returns true when this push is allowed (under both caps); false when
+ * one of the caps is already at or above its limit. The counter is only
+ * incremented on success, so a rejected push does not "consume" quota.
+ *
+ * Counters are stored as fixed-bucket keys in Redis with TTL slightly
+ * longer than the bucket (60 min / 24 h), so they auto-expire without
+ * external cleanup. A bucket is the floor of the current epoch / size.
+ *
+ * Replies to user-initiated chat messages should NOT call this — the
+ * user just typed something, we have to answer them.
+ */
+export async function recordAndCheckPushQuota(
+  redis: Redis,
+  userId: string,
+  prefs: BotPreferences,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const { maxPerHour, maxPerDay } = prefs.throttling;
+  // 0 means "no caps" — let everything through.
+  if (maxPerHour <= 0 && maxPerDay <= 0) return true;
+
+  const hourBucket = Math.floor(now.getTime() / (60 * 60_000));
+  const dayBucket = Math.floor(now.getTime() / (24 * 60 * 60_000));
+  const hourKey = `push:quota:user:${userId}:h:${hourBucket}`;
+  const dayKey = `push:quota:user:${userId}:d:${dayBucket}`;
+
+  const allowed = (await redis.eval(
+    PUSH_QUOTA_SCRIPT,
+    2,
+    hourKey,
+    dayKey,
+    String(maxPerHour),
+    String(maxPerDay),
+    String(2 * 60 * 60), // hour bucket TTL — 2h gives slack across boundaries
+    String(2 * 24 * 60 * 60), // day bucket TTL — 2d gives slack across boundaries
+  )) as number;
+
+  return allowed === 1;
+}
+
+const PUSH_QUOTA_SCRIPT = `
+local hourKey = KEYS[1]
+local dayKey = KEYS[2]
+local hourLimit = tonumber(ARGV[1])
+local dayLimit = tonumber(ARGV[2])
+local hourTtl = tonumber(ARGV[3])
+local dayTtl = tonumber(ARGV[4])
+
+local hourCount = tonumber(redis.call('GET', hourKey) or '0')
+local dayCount = tonumber(redis.call('GET', dayKey) or '0')
+
+if hourLimit > 0 and hourCount >= hourLimit then return 0 end
+if dayLimit > 0 and dayCount >= dayLimit then return 0 end
+
+local newHour = redis.call('INCR', hourKey)
+if newHour == 1 then redis.call('EXPIRE', hourKey, hourTtl) end
+local newDay = redis.call('INCR', dayKey)
+if newDay == 1 then redis.call('EXPIRE', dayKey, dayTtl) end
+return 1
+`;
 
 function parseHHMM(s: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(s);
