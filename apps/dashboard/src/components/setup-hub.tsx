@@ -142,9 +142,27 @@ export function SetupHub() {
             {linkCode?.channel === chosenChannel ? <LinkCodeCard code={linkCode} /> : null}
           </>
         ) : (
-          <div className="hub__linked-banner">
-            {channelMeta.name} is connected. You can head straight into the hub now.
-          </div>
+          <>
+            <div className="hub__linked-banner">
+              {channelMeta.name} is connected. You can head straight into the hub now.
+            </div>
+            <div className="hub__relink">
+              <p>
+                Switching to a different {channelMeta.name} account, or re-linking after a reset?
+              </p>
+              <button
+                className="hub__ghost"
+                disabled={isPending}
+                onClick={generateLinkCode}
+                type="button"
+              >
+                {linkCode?.channel === chosenChannel
+                  ? 'Regenerate Re-link Code'
+                  : `Re-link ${channelMeta.name}`}
+              </button>
+              {linkCode?.channel === chosenChannel ? <LinkCodeCard code={linkCode} /> : null}
+            </div>
+          </>
         )}
 
         <div className="hub__instructions">
