@@ -263,7 +263,15 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
             // Only fire on articles published since the last fire (or
             // since the lookback cutoff if never fired).
             const since = alert.lastFiredAt ?? newsCutoff;
-            const fresh = articles.filter((a) => a.publishedAt > since);
+            let fresh = articles.filter((a) => a.publishedAt > since);
+            // News filter strength: in `major_only` mode the user only
+            // wants high-severity headlines; medium-severity rows are
+            // dropped here. `portfolio` and `all` keep both severities
+            // since the article was already pre-filtered to the user's
+            // watched symbol via affected_assets.
+            if (prefs?.newsFilter.strength === 'major_only') {
+              fresh = fresh.filter((a) => a.severity === 'high');
+            }
             if (fresh.length === 0) continue;
 
             // Deliver one outbound per fresh article; dedup at the
