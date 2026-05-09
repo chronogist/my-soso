@@ -83,7 +83,10 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
       return reply.status(403).send({ error: 'forbidden' });
     }
 
-    return reply.status(200).type('text/plain').send(challenge ?? '');
+    return reply
+      .status(200)
+      .type('text/plain')
+      .send(challenge ?? '');
   });
 
   app.post('/webhooks/whatsapp', async (req, reply) => {
@@ -120,7 +123,7 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
       const text = inbound.message.text.body;
       const externalUserId = inbound.message.from;
       const conversationId = inbound.conversationId;
-      const idempotencyKey = `whatsapp:${inbound.message.id}`;
+      const idempotencyKey = `whatsapp-${inbound.message.id}`;
       const linkCode = parseLinkCommand(text);
 
       if (linkCode) {
@@ -136,10 +139,10 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
               externalUserId,
               conversationId,
               text: 'That link code is expired or invalid. Open the My-Soso dashboard and generate a fresh WhatsApp code.',
-              idempotencyKey: `link-failed:${idempotencyKey}`,
+              idempotencyKey: `link-failed-${idempotencyKey}`,
               whatsappTemplate: 'link_confirmation',
             },
-            { jobId: `link-failed:${idempotencyKey}` },
+            { jobId: `link-failed-${idempotencyKey}` },
           );
           continue;
         }
@@ -168,10 +171,10 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
               externalUserId,
               conversationId,
               text: 'I could not link this WhatsApp account. It may already be connected elsewhere. Generate a fresh code and try again.',
-              idempotencyKey: `link-conflict:${idempotencyKey}`,
+              idempotencyKey: `link-conflict-${idempotencyKey}`,
               whatsappTemplate: 'link_confirmation',
             },
-            { jobId: `link-conflict:${idempotencyKey}` },
+            { jobId: `link-conflict-${idempotencyKey}` },
           );
           continue;
         }
@@ -184,9 +187,9 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
             externalUserId,
             conversationId,
             text: 'WhatsApp is linked. Your My-Soso agent now knows this chat belongs to you.',
-            idempotencyKey: `link-ok:${idempotencyKey}`,
+            idempotencyKey: `link-ok-${idempotencyKey}`,
           },
-          { jobId: `link-ok:${idempotencyKey}` },
+          { jobId: `link-ok-${idempotencyKey}` },
         );
         continue;
       }
@@ -210,10 +213,10 @@ export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): v
             externalUserId,
             conversationId,
             text: 'I am ready, but this WhatsApp number is not linked yet. Sign in to the My-Soso dashboard, generate a WhatsApp code, then send /link CODE here.',
-            idempotencyKey: `unlinked:${idempotencyKey}`,
+            idempotencyKey: `unlinked-${idempotencyKey}`,
             whatsappTemplate: 'link_confirmation',
           },
-          { jobId: `unlinked:${idempotencyKey}` },
+          { jobId: `unlinked-${idempotencyKey}` },
         );
         continue;
       }

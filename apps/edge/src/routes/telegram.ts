@@ -130,7 +130,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
 
     const conversationId = String(message.chat.id);
     const externalUserId = String(message.from.id);
-    const idempotencyKey = `telegram:${parsed.data.update_id}`;
+    const idempotencyKey = `telegram-${parsed.data.update_id}`;
     const linkCode = parseLinkCommand(message.text);
 
     if (linkCode) {
@@ -147,7 +147,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
           externalUserId,
           conversationId,
           text: 'That link code is expired or invalid. Open the My-Soso dashboard and generate a fresh Telegram code.',
-          idempotencyKey: `link-failed:${idempotencyKey}`,
+          idempotencyKey: `link-failed-${idempotencyKey}`,
         });
         return reply.status(200).send({ ok: true });
       }
@@ -173,7 +173,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
           externalUserId,
           conversationId,
           text: 'I could not link this Telegram account. It may already be connected to another My-Soso account. Generate a fresh code from the dashboard and try again.',
-          idempotencyKey: `link-conflict:${idempotencyKey}`,
+          idempotencyKey: `link-conflict-${idempotencyKey}`,
         });
         return reply.status(200).send({ ok: true });
       }
@@ -183,7 +183,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
         externalUserId,
         conversationId,
         text: 'Telegram is linked. Your My-Soso agent now knows this chat belongs to you.',
-        idempotencyKey: `link-ok:${idempotencyKey}`,
+        idempotencyKey: `link-ok-${idempotencyKey}`,
       });
       req.log.info({ userId: linkPayload.data.userId }, 'telegram account linked');
       return reply.status(200).send({ ok: true });
@@ -202,7 +202,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
         externalUserId,
         conversationId,
         text: 'I am ready, but this Telegram chat is not linked yet. Sign in to the My-Soso dashboard, generate a Telegram code, then send /link CODE here.',
-        idempotencyKey: `unlinked:${idempotencyKey}`,
+        idempotencyKey: `unlinked-${idempotencyKey}`,
       });
       return reply.status(200).send({ ok: true });
     }

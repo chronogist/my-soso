@@ -191,7 +191,7 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
             const fires = comparePrice(price, alert.priceOp, threshold);
             if (!fires) continue;
 
-            const dedupKey = `price-cross:${hourBucket(new Date())}`;
+            const dedupKey = `price-cross-${hourBucket(new Date())}`;
             const message = formatPriceMessage(alert.assetSymbol, alert.priceOp, threshold, price);
             await fireDelivery({
               db: opts.db,
@@ -220,7 +220,7 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
             // Deliver one outbound per fresh article; dedup at the
             // (alert, article) level so a re-tick doesn't double-send.
             for (const article of fresh) {
-              const dedupKey = `news:${article.articleId}`;
+              const dedupKey = `news-${article.articleId}`;
               const message = formatNewsMessage(alert.assetSymbol, article);
               await fireDelivery({
                 db: opts.db,
@@ -349,9 +349,9 @@ async function fireDelivery(args: FireDeliveryArgs): Promise<void> {
       conversationId: link.channelUserId,
       text: message,
       ...(link.channel === 'whatsapp' ? { whatsappTemplate: 'alert' as const } : {}),
-      idempotencyKey: `alert:${alert.id}:${dedupKey}`,
+      idempotencyKey: `alert-${alert.id}-${dedupKey}`,
     },
-    { jobId: `alert:${alert.id}:${dedupKey}` },
+    { jobId: `alert-${alert.id}-${dedupKey}` },
   );
   stats.deliveriesSent++;
 

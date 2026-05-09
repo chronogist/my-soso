@@ -238,9 +238,9 @@ async function sendDigest(args: SendDigestArgs): Promise<void> {
         conversationId: args.channelUserId,
         text: "Your watchlist is empty — add a few assets and I'll have something to tell you tomorrow.",
         ...(args.channel === 'whatsapp' ? { whatsappTemplate: 'digest' as const } : {}),
-        idempotencyKey: `digest:${args.schedule}:${args.periodKey}:${args.userId}`,
+        idempotencyKey: `digest-${args.schedule}-${args.periodKey}-${args.userId}`,
       },
-      { jobId: `digest:${args.schedule}:${args.periodKey}:${args.userId}` },
+      { jobId: `digest-${args.schedule}-${args.periodKey}-${args.userId}` },
     );
     return;
   }
@@ -281,9 +281,9 @@ async function sendDigest(args: SendDigestArgs): Promise<void> {
       conversationId: args.channelUserId,
       text,
       ...(args.channel === 'whatsapp' ? { whatsappTemplate: 'digest' as const } : {}),
-      idempotencyKey: `digest:${args.schedule}:${args.periodKey}:${args.userId}`,
+      idempotencyKey: `digest-${args.schedule}-${args.periodKey}-${args.userId}`,
     },
-    { jobId: `digest:${args.schedule}:${args.periodKey}:${args.userId}` },
+    { jobId: `digest-${args.schedule}-${args.periodKey}-${args.userId}` },
   );
 
   args.log.info(

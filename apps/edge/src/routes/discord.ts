@@ -105,7 +105,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
     const text = discord.slashCommandText(interaction);
     const commandName = interaction.data?.name?.toLowerCase();
     const conversationId = interaction.channel_id ?? externalUserId ?? interaction.id;
-    const idempotencyKey = `discord:${interaction.id}`;
+    const idempotencyKey = `discord-${interaction.id}`;
 
     if (!externalUserId || !text) {
       return reply.status(200).send({

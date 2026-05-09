@@ -19,10 +19,7 @@ import type { Database } from '@my-soso/db';
 import { handleCommand } from '../commands.js';
 import type { Agent, RunAgentResult } from '../agent/agent.js';
 import { writeAuditEntry } from '../agent/audit.js';
-import type {
-  AuditClassification,
-  ComplianceClassifier,
-} from '../agent/compliance.js';
+import type { AuditClassification, ComplianceClassifier } from '../agent/compliance.js';
 import { withSentry } from '../sentry.js';
 
 export interface InboundConsumerHandles {
@@ -192,7 +189,7 @@ export function startInboundConsumer({
               ...(inbound.discordInteractionToken
                 ? { discordInteractionToken: inbound.discordInteractionToken }
                 : {}),
-              idempotencyKey: `reply:${inbound.idempotencyKey}`,
+              idempotencyKey: `reply-${inbound.idempotencyKey}`,
             };
 
             await outboundQueue.add('outbound', outbound, { jobId: outbound.idempotencyKey });
