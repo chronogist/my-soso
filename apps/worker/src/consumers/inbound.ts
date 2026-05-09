@@ -20,6 +20,7 @@ import { handleCommand } from '../commands.js';
 import type { Agent, RunAgentResult } from '../agent/agent.js';
 import { writeAuditEntry } from '../agent/audit.js';
 import type { AuditClassification, ComplianceClassifier } from '../agent/compliance.js';
+import { loadUserPreferences } from '../preferences.js';
 import { withSentry } from '../sentry.js';
 
 export interface InboundConsumerHandles {
@@ -136,10 +137,15 @@ export function startInboundConsumer({
               replyText = command.text;
             } else {
               try {
+                const prefs = await loadUserPreferences(db, inbound.userId);
+                const channelTone = prefs.channelOverrides?.[inbound.channel]?.tone;
                 const result = await agent.run({
                   userMessage: inbound.text,
                   conversationId: inbound.conversationId,
                   userId: inbound.userId,
+                  tone: channelTone ?? prefs.tone,
+                  verbosity: prefs.verbosity,
+                  language: prefs.language,
                 });
                 const review = await compliance.review({
                   userMessage: inbound.text,

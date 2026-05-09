@@ -3,8 +3,9 @@ import type { Logger } from 'pino';
 import type { MarketDataProvider, NewsProvider } from '@my-soso/providers';
 import type { Database } from '@my-soso/db';
 import { buildAgentTools } from './tools.js';
-import { SYSTEM_PROMPT } from './system-prompt.js';
+import { buildSystemPrompt } from './system-prompt.js';
 import { createOpenRouterModel } from './openrouter.js';
+import type { Tone, Verbosity } from '../preferences.js';
 
 export interface AgentDeps {
   market: MarketDataProvider;
@@ -27,6 +28,15 @@ export interface RunAgentInput {
   conversationId: string;
   /** Authenticated user. Required so watchlist tools can write under RLS. */
   userId: string;
+  /**
+   * User-chosen voice preferences. Inbound consumer loads these from
+   * `users.preferences` and passes them in. Falls back to safe defaults
+   * if the field is omitted so callers without preferences (e.g. tests)
+   * still work.
+   */
+  tone?: Tone;
+  verbosity?: Verbosity;
+  language?: string;
 }
 
 export interface RunAgentResult {
@@ -49,7 +59,7 @@ export function createAgent(deps: AgentDeps): Agent {
   const maxOutputTokens = deps.maxOutputTokens ?? 600;
 
   return {
-    run: async ({ userMessage, conversationId, userId }) => {
+    run: async ({ userMessage, conversationId, userId, tone, verbosity, language }) => {
       // Tools are rebuilt per call so the closures over `userId` are
       // bounded to a single message — no chance of cross-tenant leak
       // through a stale tool reference.
@@ -61,7 +71,11 @@ export function createAgent(deps: AgentDeps): Agent {
       });
       const result = await generateText({
         model,
-        system: SYSTEM_PROMPT,
+        system: buildSystemPrompt({
+          tone: tone ?? 'concise',
+          verbosity: verbosity ?? 'normal',
+          language: language ?? 'en',
+        }),
         prompt: userMessage,
         tools,
         stopWhen: stepCountIs(maxSteps),
