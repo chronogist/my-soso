@@ -12,6 +12,7 @@ import { RateLimitedError, UnknownSymbolError, type MarketDataProvider } from '@
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { withSentry } from '../sentry.js';
+import { isInQuietHours, loadUserPreferencesBatch, type BotPreferences } from '../preferences.js';
 
 /**
  * Alert engine: a singleton repeatable BullMQ job that evaluates
@@ -89,7 +90,7 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
     processor: () =>
       withSentry('alert-engine', async () => {
         const startedAt = Date.now();
-        const stats = { evaluated: 0, fired: 0, deliveriesSent: 0, errors: 0 };
+        const stats = { evaluated: 0, fired: 0, deliveriesSent: 0, suppressed: 0, errors: 0 };
 
         const cooldownThreshold = new Date(Date.now() - cooldownMs);
         const newsCutoff = new Date(Date.now() - newsLookbackMs);
@@ -129,6 +130,11 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
         for (const link of channelLinks) {
           if (!linkByUser.has(link.userId)) linkByUser.set(link.userId, link);
         }
+
+        // Pre-load preferences for every user with an alert this tick.
+        // Used downstream to honor quiet hours, coverage flags, news
+        // filter strength, and per-channel mute overrides.
+        const prefsByUser = await loadUserPreferencesBatch(opts.db, userIds);
 
         // Resolve prices for the distinct symbols on price alerts.
         const priceSymbols = Array.from(
@@ -178,9 +184,18 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
         }
 
         // Evaluate each alert.
+        const tickNow = new Date();
         for (const alert of activeAlerts) {
           const link = linkByUser.get(alert.userId);
           if (!link) continue;
+
+          // Quiet hours: skip pushing alerts during the user's chosen
+          // window. Per-channel `muteAlerts` overrides take precedence.
+          const prefs = prefsByUser.get(alert.userId);
+          if (prefs && shouldSuppressAlert(prefs, link.channel, tickNow)) {
+            stats.suppressed++;
+            continue;
+          }
 
           if (alert.kind === 'price') {
             const price = priceMap.get(alert.assetSymbol);
@@ -263,6 +278,22 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
       await outbound.close();
     },
   };
+}
+
+/**
+ * Decide whether to skip pushing an alert to a given user/channel given
+ * their current preferences. Returns true if the alert should be
+ * dropped from this tick (quiet hours active, or the channel is muted
+ * via `channelOverrides[channel].muteAlerts`).
+ */
+function shouldSuppressAlert(
+  prefs: BotPreferences,
+  channel: 'telegram' | 'discord' | 'whatsapp',
+  now: Date,
+): boolean {
+  if (prefs.channelOverrides?.[channel]?.muteAlerts) return true;
+  if (isInQuietHours(prefs, now)) return true;
+  return false;
 }
 
 function comparePrice(price: number, op: 'lt' | 'lte' | 'gt' | 'gte', threshold: number): boolean {

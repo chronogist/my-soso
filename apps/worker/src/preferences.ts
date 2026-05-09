@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { schema, type Database } from '@my-soso/db';
 import { z } from 'zod';
 
@@ -120,4 +120,78 @@ export async function loadUserPreferences(db: Database, userId: string): Promise
     .where(eq(schema.users.id, userId))
     .limit(1);
   return parsePreferences(rows[0]?.preferences);
+}
+
+/**
+ * Batch-load preferences for many users in a single round trip. Used by
+ * the alert engine and digest sender, which iterate over users and need
+ * each user's preferences before deciding whether to send.
+ */
+export async function loadUserPreferencesBatch(
+  db: Database,
+  userIds: string[],
+): Promise<Map<string, BotPreferences>> {
+  const out = new Map<string, BotPreferences>();
+  if (userIds.length === 0) return out;
+  const rows = await db
+    .select({ id: schema.users.id, preferences: schema.users.preferences })
+    .from(schema.users)
+    .where(inArray(schema.users.id, userIds));
+  for (const r of rows) out.set(r.id, parsePreferences(r.preferences));
+  // Users without a row still need a default — the caller may pass user
+  // ids that have not yet been provisioned (e.g. test fixtures).
+  for (const id of userIds) if (!out.has(id)) out.set(id, DEFAULT_PREFERENCES);
+  return out;
+}
+
+/**
+ * True when `now` falls inside the user's quiet-hours window. Window
+ * crossing midnight is supported (e.g. 22:00 → 07:00). Times in the
+ * preferences are interpreted in the user's `timezone`. Invalid time
+ * strings or unknown timezones return false rather than blocking sends.
+ */
+export function isInQuietHours(prefs: BotPreferences, now: Date = new Date()): boolean {
+  if (!prefs.quietHours.enabled) return false;
+  const start = parseHHMM(prefs.quietHours.start);
+  const end = parseHHMM(prefs.quietHours.end);
+  if (start === null || end === null) return false;
+
+  let hour: number;
+  let minute: number;
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: prefs.timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = fmt.formatToParts(now);
+    hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+    minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+    // Intl returns "24" for midnight in some browsers; normalize.
+    if (hour === 24) hour = 0;
+  } catch {
+    return false;
+  }
+
+  const nowMinutes = hour * 60 + minute;
+  const startMinutes = start;
+  const endMinutes = end;
+
+  if (startMinutes === endMinutes) return false;
+  if (startMinutes < endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+  // Window wraps midnight: e.g. 22:00 → 07:00 covers >=22:00 OR <07:00.
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
+function parseHHMM(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
 }
