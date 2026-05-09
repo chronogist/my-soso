@@ -68,6 +68,8 @@ export function createAgent(deps: AgentDeps): Agent {
         news: deps.news,
         db: deps.db,
         userId,
+        log: deps.log,
+        conversationId,
       });
       const result = await generateText({
         model,

@@ -19,8 +19,14 @@ export function createOpenRouterModel({
     baseURL: OPENROUTER_BASE_URL,
   });
   const modelId = model ?? DEFAULT_MODEL;
+  // Force Chat Completions (not Responses API). @ai-sdk/openai v3
+  // defaults to OpenAI's newer Responses API when called as
+  // `openrouter(modelId)`, which OpenRouter's compatibility layer does
+  // not fully support — tool-call roundtrips fail with
+  // "Invalid Responses API request" / invalid_prompt. `.chat()` pins
+  // the legacy chat-completions endpoint that OpenRouter mirrors 1:1.
   return {
-    model: openrouter(modelId),
+    model: openrouter.chat(modelId),
     modelId,
   };
 }

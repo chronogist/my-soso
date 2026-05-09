@@ -1,4 +1,5 @@
 import { tool } from 'ai';
+import type { Logger } from 'pino';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -24,6 +25,12 @@ export interface ToolDeps {
   db: Database;
   /** Authenticated user. Watchlist mutations are scoped to this id. */
   userId: string;
+  /** Optional logger. When provided, every tool call logs its name,
+   * arguments, and outcome. Lets us confirm SoSoValue + DB roundtrips
+   * by inspecting the worker terminal. */
+  log?: Logger;
+  /** Conversation id for log correlation. */
+  conversationId?: string;
 }
 
 /**
@@ -38,13 +45,44 @@ export interface ToolDeps {
  * inside the function rather than threading it through Vercel AI
  * SDK internals.
  */
-export function buildAgentTools({ market, news, db, userId }: ToolDeps) {
+export function buildAgentTools({ market, news, db, userId, log, conversationId }: ToolDeps) {
+  /**
+   * Wrap each tool's execute fn with a single log line per call.
+   * Captures tool name, args, outcome (`ok` flag from the result), and
+   * elapsed ms — enough to confirm a SoSoValue or DB roundtrip happened
+   * and to spot slow calls in production.
+   */
+  const trace =
+    <A, R>(name: string, fn: (args: A) => Promise<R>) =>
+    async (args: A): Promise<R> => {
+      const startedAt = Date.now();
+      log?.info({ tool: name, args, conversationId }, 'tool call started');
+      try {
+        const result = await fn(args);
+        const ok =
+          typeof result === 'object' && result !== null && 'ok' in result
+            ? (result as { ok: boolean }).ok
+            : true;
+        log?.info(
+          { tool: name, ok, durationMs: Date.now() - startedAt, conversationId },
+          'tool call complete',
+        );
+        return result;
+      } catch (err) {
+        log?.error(
+          { tool: name, err, durationMs: Date.now() - startedAt, conversationId },
+          'tool call threw',
+        );
+        throw err;
+      }
+    };
+
   return {
     getPrice: tool({
       description:
         'Fetch the current spot price and 24h change for a crypto asset by ticker symbol.',
       inputSchema: z.object({ symbol: SymbolArg }),
-      execute: async ({ symbol }) => {
+      execute: trace('getPrice', async ({ symbol }: { symbol: string }) => {
         try {
           const p = await market.getPrice(symbol);
           return {
@@ -59,7 +97,7 @@ export function buildAgentTools({ market, news, db, userId }: ToolDeps) {
         } catch (err) {
           return mapToolError(err, symbol);
         }
-      },
+      }),
     }),
 
     getNewsForAsset: tool({
@@ -75,24 +113,118 @@ export function buildAgentTools({ market, news, db, userId }: ToolDeps) {
           .default(5)
           .describe('Maximum number of news items to return.'),
       }),
-      execute: async ({ symbol, limit }) => {
+      execute: trace(
+        'getNewsForAsset',
+        async ({ symbol, limit }: { symbol: string; limit: number }) => {
+          try {
+            const items = await news.getNewsForAsset(symbol, { limit });
+            return {
+              ok: true as const,
+              symbol: symbol.toUpperCase(),
+              items: items.map((n) => ({
+                title: n.title,
+                url: n.url,
+                publisher: n.publisher,
+                summary: n.summary,
+                publishedAt: n.publishedAt.toISOString(),
+              })),
+            };
+          } catch (err) {
+            return mapToolError(err, symbol);
+          }
+        },
+      ),
+    }),
+
+    getLatestNews: tool({
+      description:
+        'Fetch the latest market-wide crypto news headlines. Returns up to 20 items with title, source, tagged symbols, and a short summary.',
+      inputSchema: z.object({
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .default(5)
+          .describe('Maximum number of news items to return.'),
+      }),
+      execute: trace('getLatestNews', async ({ limit }: { limit: number }) => {
         try {
-          const items = await news.getNewsForAsset(symbol, { limit });
+          const items = await news.getLatestNews({ limit });
           return {
             ok: true as const,
-            symbol: symbol.toUpperCase(),
             items: items.map((n) => ({
               title: n.title,
               url: n.url,
               publisher: n.publisher,
               summary: n.summary,
+              symbols: n.symbols,
               publishedAt: n.publishedAt.toISOString(),
             })),
           };
         } catch (err) {
+          return mapToolError(err, 'market-wide news');
+        }
+      }),
+    }),
+
+    getETFFlow: tool({
+      description:
+        'Fetch the latest net flow snapshot for a crypto ETF ticker such as IBIT or FBTC.',
+      inputSchema: z.object({ symbol: SymbolArg }),
+      execute: trace('getETFFlow', async ({ symbol }: { symbol: string }) => {
+        try {
+          const flow = await market.getETFFlow(symbol);
+          return {
+            ok: true as const,
+            symbol: flow.symbol,
+            underlying: flow.underlying,
+            netFlowUsd: flow.netFlowUsd,
+            cumulativeFlowUsd: flow.cumulativeFlowUsd,
+            netAssetsUsd: flow.netAssetsUsd,
+            asOf: flow.asOf.toISOString(),
+          };
+        } catch (err) {
           return mapToolError(err, symbol);
         }
-      },
+      }),
+    }),
+
+    getIndex: tool({
+      description: 'Fetch the latest value and 24h change for a SoSoValue index ticker.',
+      inputSchema: z.object({ symbol: SymbolArg }),
+      execute: trace('getIndex', async ({ symbol }: { symbol: string }) => {
+        try {
+          const idx = await market.getIndex(symbol);
+          return {
+            ok: true as const,
+            symbol: idx.symbol,
+            name: idx.name,
+            value: idx.value,
+            change24hPct: idx.change24hPct,
+            asOf: idx.asOf.toISOString(),
+          };
+        } catch (err) {
+          return mapToolError(err, symbol);
+        }
+      }),
+    }),
+
+    listIndices: tool({
+      description:
+        'List the available SoSoValue index ticker symbols. Use this before getIndex when the user asks what indices exist.',
+      inputSchema: z.object({}),
+      execute: trace('listIndices', async () => {
+        try {
+          const symbols = await market.listIndices();
+          return {
+            ok: true as const,
+            symbols,
+          };
+        } catch (err) {
+          return mapToolError(err, 'indices');
+        }
+      }),
     }),
 
     listWatchlist: tool({
