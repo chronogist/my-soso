@@ -17,6 +17,8 @@ const ConfigSchema = z.object({
   SENTRY_DSN: optionalUrl(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1),
+  TELEGRAM_BOT_TOKEN: optionalString(),
+  TELEGRAM_WEBHOOK_URL: optionalUrl(),
   DISCORD_PUBLIC_KEY: optionalString(),
   WHATSAPP_VERIFY_TOKEN: optionalString(),
   WHATSAPP_APP_SECRET: optionalString(),

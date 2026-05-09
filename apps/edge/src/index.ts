@@ -1,6 +1,7 @@
 import { loadConfig } from './config.js';
 import { initSentry } from './sentry.js';
 import { buildServer } from './server.js';
+import { autoRegisterTelegramWebhook } from './telegram-auto-register.js';
 
 async function main() {
   const config = loadConfig();
@@ -14,6 +15,10 @@ async function main() {
     app.log.error(err);
     process.exit(1);
   }
+
+  void autoRegisterTelegramWebhook(config, app.log).catch((err: unknown) => {
+    app.log.error({ err }, 'telegram auto-register: unexpected failure');
+  });
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
