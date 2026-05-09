@@ -14,6 +14,7 @@ import { RateLimitedError, type MarketDataProvider, type Price } from '@my-soso/
 import type { Logger } from 'pino';
 import { withSentry } from '../sentry.js';
 import { createOpenRouterModel } from '../agent/openrouter.js';
+import { loadUserPreferences, type BotPreferences } from '../preferences.js';
 
 /**
  * Daily and weekly digest. Runs hourly; per tick, finds the
@@ -218,6 +219,37 @@ async function sendDigest(args: SendDigestArgs): Promise<void> {
   );
   if (claim.length === 0) return;
 
+  // Load user preferences so the digest body honors digestSections,
+  // newsFilter strength, and per-channel mute overrides. Defaults are
+  // returned when the row is missing — never block a digest on a parse
+  // error.
+  const prefs = await loadUserPreferences(args.db, args.userId);
+
+  // Per-channel override: a channel can be muted explicitly while still
+  // subscribed to a digest schedule. Treat the same as "skip this send"
+  // — the deliveries row was already claimed so we won't try again
+  // until the next period.
+  if (prefs.channelOverrides?.[args.channel]?.muteAlerts) {
+    args.log.info(
+      { userId: args.userId, schedule: args.schedule, channel: args.channel },
+      'digest skipped: channel muted by user',
+    );
+    return;
+  }
+
+  const includePrices = prefs.digestSections.includes('prices');
+  const includeNews = prefs.digestSections.includes('news');
+
+  // Both sections off → user has effectively turned the digest off via
+  // section toggles. Skip the LLM call and the send entirely.
+  if (!includePrices && !includeNews) {
+    args.log.info(
+      { userId: args.userId, schedule: args.schedule },
+      'digest skipped: no sections enabled',
+    );
+    return;
+  }
+
   // Watchlist for the user.
   const watchlistRows = await withTenantUser(args.db, args.userId, async (tx) =>
     tx
@@ -246,30 +278,40 @@ async function sendDigest(args: SendDigestArgs): Promise<void> {
   }
 
   // Prices for the watchlist (cache absorbs repeats across users).
-  const prices = await args.market.getPrices(symbols);
+  // Skip the fetch entirely when the user opted out of the price section.
+  const prices = includePrices ? await args.market.getPrices(symbols) : new Map<string, Price>();
 
-  // News intersecting the watchlist in the lookback window.
+  // News intersecting the watchlist in the lookback window. The severity
+  // filter uses prefs.newsFilter.strength: major_only narrows to high,
+  // anything else keeps medium-or-high. Skip the query when news is off.
+  const severityFilter =
+    prefs.newsFilter.strength === 'major_only'
+      ? sql`${schema.newsExtractions.severity} = 'high'`
+      : sql`${schema.newsExtractions.severity} IN ('medium', 'high')`;
   const newsCutoff = new Date(Date.now() - args.newsLookbackMs);
-  const newsRows = await withServiceContext(args.db, async (tx) =>
-    tx
-      .select()
-      .from(schema.newsExtractions)
-      .where(
-        and(
-          gt(schema.newsExtractions.publishedAt, newsCutoff),
-          sql`${schema.newsExtractions.affectedAssets} && ${symbols}::text[]`,
-          sql`${schema.newsExtractions.severity} IN ('medium', 'high')`,
-        ),
+  const newsRows = includeNews
+    ? await withServiceContext(args.db, async (tx) =>
+        tx
+          .select()
+          .from(schema.newsExtractions)
+          .where(
+            and(
+              gt(schema.newsExtractions.publishedAt, newsCutoff),
+              sql`${schema.newsExtractions.affectedAssets} && ${symbols}::text[]`,
+              severityFilter,
+            ),
+          )
+          .orderBy(desc(schema.newsExtractions.publishedAt))
+          .limit(15),
       )
-      .orderBy(desc(schema.newsExtractions.publishedAt))
-      .limit(15),
-  );
+    : [];
 
   const text = await synthesizeDigest({
     schedule: args.schedule,
     prices,
     news: newsRows,
     model: args.model,
+    prefs,
   });
 
   await args.outbound.add(
@@ -303,9 +345,12 @@ interface SynthesizeArgs {
   prices: ReadonlyMap<string, Price>;
   news: (typeof schema.newsExtractions.$inferSelect)[];
   model: LanguageModel;
+  prefs: BotPreferences;
 }
 
 async function synthesizeDigest(args: SynthesizeArgs): Promise<string> {
+  const includePrices = args.prefs.digestSections.includes('prices');
+  const includeNews = args.prefs.digestSections.includes('news');
   const priceLines = Array.from(args.prices.entries()).map(([sym, p]) => {
     const change = p.change24hPct === null ? 'n/a' : `${p.change24hPct.toFixed(2)}%`;
     return `- ${sym}: $${p.price.toFixed(p.price < 1 ? 4 : 2)} (${change})`;
@@ -315,15 +360,25 @@ async function synthesizeDigest(args: SynthesizeArgs): Promise<string> {
   );
 
   const window = args.schedule === 'daily' ? 'last 24 hours' : 'last 7 days';
-  const prompt = [
-    `Compose the user's ${args.schedule} digest. Window: ${window}.`,
-    '',
-    'Watchlist prices (24h change):',
-    priceLines.length > 0 ? priceLines.join('\n') : '(none)',
-    '',
-    `Relevant news (${args.news.length} items, medium/high severity, sorted newest first):`,
-    newsLines.length > 0 ? newsLines.join('\n') : '(none)',
-  ].join('\n');
+  const sections: string[] = [`Compose the user's ${args.schedule} digest. Window: ${window}.`, ''];
+  if (includePrices) {
+    sections.push(
+      'Watchlist prices (24h change):',
+      priceLines.length > 0 ? priceLines.join('\n') : '(none)',
+      '',
+    );
+  }
+  if (includeNews) {
+    const severityNote =
+      args.prefs.newsFilter.strength === 'major_only'
+        ? 'high severity only'
+        : 'medium/high severity';
+    sections.push(
+      `Relevant news (${args.news.length} items, ${severityNote}, sorted newest first):`,
+      newsLines.length > 0 ? newsLines.join('\n') : '(none)',
+    );
+  }
+  const prompt = sections.join('\n');
 
   const result = await generateText({
     model: args.model,
