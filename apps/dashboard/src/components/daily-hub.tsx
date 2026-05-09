@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, type ChangeEvent } from 'react';
 import type { BotPreferences, Tone, Verbosity, NewsStrength } from '../lib/api';
 import { AccountSummaryCard, CHANNEL_META, handoffAction } from './hub-shared';
@@ -64,6 +65,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function DailyHub() {
   const state = useHubState();
+  const router = useRouter();
   const {
     ready,
     authenticated,
@@ -790,6 +792,9 @@ export function DailyHub() {
         ) : null}
 
         <footer className="hub__footer">
+          <button className="hub__ghost" onClick={() => router.push('/setup')}>
+            Manage Channels
+          </button>
           <button className="hub__ghost" onClick={changePlatform}>
             Change Platform
           </button>

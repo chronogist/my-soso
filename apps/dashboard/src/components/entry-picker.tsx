@@ -1,23 +1,49 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
-import {
-  type Channel,
-  persistChosenChannel,
-  readChosenChannel,
-} from '../lib/channels';
+import { type Channel, persistChosenChannel, readChosenChannel } from '../lib/channels';
+import { apiFetch, type ChannelLink } from '../lib/api';
 
 export function EntryPicker() {
   const router = useRouter();
-  const { ready, authenticated, login } = usePrivy();
+  const { ready, authenticated, login, getAccessToken } = usePrivy();
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (!ready || !authenticated) return;
-    const stored = readChosenChannel();
-    if (stored) router.replace('/setup');
-  }, [ready, authenticated, router]);
+    let cancelled = false;
+    setResolving(true);
+    void (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) return;
+        const { links } = await apiFetch<{ links: ChannelLink[] }>('/v1/channel-links', token);
+        if (cancelled) return;
+        if (links.length > 0) {
+          // Returning user with at least one linked channel — pin the first
+          // linked channel so /hub has a chosenChannel to render against,
+          // then hand them to /hub directly. They can still revisit /setup
+          // from the hub if they need to adjust or add another channel.
+          if (!readChosenChannel()) {
+            persistChosenChannel(links[0]!.channel);
+          }
+          router.replace('/hub');
+          return;
+        }
+        if (readChosenChannel()) router.replace('/setup');
+      } catch {
+        // API unreachable — fall through and let the picker render so the
+        // user can still choose a platform manually.
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, authenticated, getAccessToken, router]);
 
   function selectChannel(channel: Channel) {
     persistChosenChannel(channel);
@@ -28,7 +54,7 @@ export function EntryPicker() {
     }
   }
 
-  if (!ready) {
+  if (!ready || (authenticated && resolving)) {
     return (
       <main className="entry">
         <div className="entry__brand">
