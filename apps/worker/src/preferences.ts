@@ -253,6 +253,58 @@ if newDay == 1 then redis.call('EXPIRE', dayKey, dayTtl) end
 return 1
 `;
 
+/**
+ * Compute the local hour, minute, day-of-week, and ISO date for a
+ * given timezone. Used by the digest scheduler to decide whether the
+ * current tick matches the user's chosen digestTime / digestWeekday in
+ * their own timezone. Falls back to UTC when the timezone is invalid.
+ */
+export interface LocalClock {
+  hour: number;
+  minute: number;
+  /** 0=Sunday … 6=Saturday */
+  dayOfWeek: number;
+  /** YYYY-MM-DD in the local timezone, used as a per-user period key. */
+  date: string;
+}
+
+const DOW: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+export function getLocalClock(timezone: string, now: Date = new Date()): LocalClock {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      weekday: 'short',
+    }).formatToParts(now);
+  } catch {
+    return getLocalClock('UTC', now);
+  }
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? '';
+  let hour = Number(get('hour'));
+  if (hour === 24) hour = 0;
+  return {
+    hour,
+    minute: Number(get('minute')),
+    dayOfWeek: DOW[get('weekday')] ?? 0,
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+  };
+}
+
 function parseHHMM(s: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(s);
   if (!m) return null;

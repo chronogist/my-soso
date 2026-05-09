@@ -14,7 +14,12 @@ import { RateLimitedError, type MarketDataProvider, type Price } from '@my-soso/
 import type { Logger } from 'pino';
 import { withSentry } from '../sentry.js';
 import { createOpenRouterModel } from '../agent/openrouter.js';
-import { loadUserPreferences, type BotPreferences } from '../preferences.js';
+import {
+  getLocalClock,
+  loadUserPreferences,
+  loadUserPreferencesBatch,
+  type BotPreferences,
+} from '../preferences.js';
 
 /**
  * Daily and weekly digest. Runs hourly; per tick, finds the
@@ -66,8 +71,10 @@ const REPEAT_KEY = 'digest:tick';
 
 export function startDigest(opts: DigestOptions): DigestHandles {
   const intervalMs = opts.intervalMs ?? 60 * 60_000;
-  const dailyHourUtc = opts.dailyHourUtc ?? 9;
-  const weeklyDowUtc = opts.weeklyDowUtc ?? 1;
+  // dailyHourUtc / weeklyDowUtc are kept on the options object for
+  // back-compat with existing test fixtures but are no longer read —
+  // each user's preferences.digestTime / preferences.digestWeekday
+  // drive scheduling per user, in their own timezone.
   const newsLookbackMs = opts.newsLookbackMs ?? 7 * 24 * 60 * 60_000;
   const queueName = QueueNames.scheduled;
 
@@ -104,45 +111,51 @@ export function startDigest(opts: DigestOptions): DigestHandles {
         const now = new Date();
         const stats = { eligible: 0, sent: 0, skipped: 0, errors: 0 };
 
-        // Decide which schedules are due this tick.
-        const due: { schedule: 'daily' | 'weekly'; periodKey: string }[] = [];
-        if (now.getUTCHours() === dailyHourUtc) {
-          due.push({ schedule: 'daily', periodKey: dailyKey(now) });
-        }
-        if (now.getUTCHours() === dailyHourUtc && now.getUTCDay() === weeklyDowUtc) {
-          due.push({ schedule: 'weekly', periodKey: weeklyKey(now) });
-        }
-        if (due.length === 0) {
-          opts.log.info({ ...stats, durationMs: Date.now() - startedAt }, 'digest tick — not due');
-          return;
-        }
-
-        for (const { schedule, periodKey } of due) {
-          // Find users opted in to this schedule who have at least one
-          // linked channel and have not yet received this period's digest.
+        // Per-user scheduling: every hourly tick considers all users
+        // opted in to *any* schedule and decides per user whether their
+        // local hour matches their chosen digestTime (and weekday for
+        // weekly). The legacy dailyHourUtc/weeklyDowUtc options are
+        // ignored — preferences win.
+        for (const schedule of ['daily', 'weekly'] as const) {
           const userRows = await withServiceContext(opts.db, async (tx) =>
             tx.execute<{ user_id: string; channel: string; channel_user_id: string }>(sql`
               SELECT u.id AS user_id, cl.channel, cl.channel_user_id
               FROM users u
               JOIN channel_links cl ON cl.user_id = u.id
-              LEFT JOIN digest_deliveries dd
-                ON dd.user_id = u.id
-                AND dd.schedule = ${schedule}
-                AND dd.period_key = ${periodKey}
               WHERE u.digest_schedule = ${schedule}
-                AND dd.id IS NULL
             `),
           );
-          const eligible = Array.from(
+          const candidates = Array.from(
             userRows as unknown as {
               user_id: string;
               channel: string;
               channel_user_id: string;
             }[],
           );
-          stats.eligible += eligible.length;
+          if (candidates.length === 0) continue;
 
-          for (const row of eligible) {
+          // Batch-load preferences so we can decide per user without N
+          // round trips. A user with no row gets defaults.
+          const prefsByUser = await loadUserPreferencesBatch(
+            opts.db,
+            Array.from(new Set(candidates.map((c) => c.user_id))),
+          );
+
+          for (const row of candidates) {
+            const prefs = prefsByUser.get(row.user_id);
+            if (!prefs) continue;
+
+            const clock = getLocalClock(prefs.timezone, now);
+            const wantHour = Number(prefs.digestTime.split(':')[0] ?? '8');
+            if (!Number.isFinite(wantHour) || clock.hour !== wantHour) continue;
+            if (schedule === 'weekly' && clock.dayOfWeek !== prefs.digestWeekday) continue;
+
+            // periodKey is per-user-local so dedup is correct across
+            // timezones (a user in UTC-8 whose digest fires at 8am
+            // local cannot get two daily sends for the same local day).
+            const periodKey = schedule === 'daily' ? clock.date : weeklyKeyLocal(clock.date);
+            stats.eligible++;
+
             try {
               await sendDigest({
                 db: opts.db,
@@ -389,13 +402,14 @@ async function synthesizeDigest(args: SynthesizeArgs): Promise<string> {
   return result.text.trim() || 'No notable moves on your watchlist this period.';
 }
 
-function dailyKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-}
-
-function weeklyKey(d: Date): string {
-  // ISO week number, UTC.
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+/**
+ * Build a per-user weekly period key from their local YYYY-MM-DD. Two
+ * consecutive sends within the same ISO week resolve to the same key
+ * and conflict on the deliveries unique index.
+ */
+function weeklyKeyLocal(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  const target = new Date(Date.UTC(y, m - 1, d));
   const day = target.getUTCDay() || 7;
   target.setUTCDate(target.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
