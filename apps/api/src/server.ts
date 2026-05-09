@@ -19,7 +19,7 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: config.DASHBOARD_URL,
     credentials: true,
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['authorization', 'content-type'],
   });
 
