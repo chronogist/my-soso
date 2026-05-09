@@ -101,6 +101,7 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
           deliveriesSent: 0,
           suppressed: 0,
           throttled: 0,
+          outOfCoverage: 0,
           errors: 0,
         };
 
@@ -206,6 +207,15 @@ export function startAlertEngine(opts: AlertEngineOptions): AlertEngineHandles {
           const prefs = prefsByUser.get(alert.userId);
           if (prefs && shouldSuppressAlert(prefs, link.channel, tickNow)) {
             stats.suppressed++;
+            continue;
+          }
+
+          // Coverage gating: the user explicitly disabled the asset
+          // class this alert kind belongs to. Treats coverage as the
+          // umbrella "what this bot is responsible for" toggle; even
+          // a user-created alert is silenced when its umbrella is off.
+          if (prefs && !alertKindAllowedByCoverage(alert.kind, prefs)) {
+            stats.outOfCoverage++;
             continue;
           }
 
@@ -318,6 +328,43 @@ function shouldSuppressAlert(
   if (prefs.channelOverrides?.[channel]?.muteAlerts) return true;
   if (isInQuietHours(prefs, now)) return true;
   return false;
+}
+
+/**
+ * Map an alert's kind onto the user's coverage flags. The user's
+ * coverage choices act as the umbrella "what asset classes is this bot
+ * watching" — when the relevant flag is off the alert is silenced even
+ * if the user previously created it.
+ *
+ * News alerts pass when any of the major coverage flags is on; the
+ * underlying news_extractions row could be tagged across categories
+ * and we deliberately err toward delivery rather than silently dropping.
+ */
+function alertKindAllowedByCoverage(
+  kind: 'price' | 'news' | 'etf_flow' | 'index_move' | 'sentiment' | 'macro',
+  prefs: BotPreferences,
+): boolean {
+  switch (kind) {
+    case 'price':
+    case 'sentiment':
+      return prefs.coverage.currencies;
+    case 'etf_flow':
+      return prefs.coverage.etfs;
+    case 'index_move':
+      return prefs.coverage.ssiIndices;
+    case 'macro':
+      return prefs.coverage.macro;
+    case 'news':
+      return (
+        prefs.coverage.currencies ||
+        prefs.coverage.etfs ||
+        prefs.coverage.ssiIndices ||
+        prefs.coverage.macro ||
+        prefs.coverage.cryptoStocks ||
+        prefs.coverage.btcTreasuries ||
+        prefs.coverage.fundraising
+      );
+  }
 }
 
 function comparePrice(price: number, op: 'lt' | 'lte' | 'gt' | 'gte', threshold: number): boolean {
