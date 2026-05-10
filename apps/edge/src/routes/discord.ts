@@ -133,50 +133,70 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
       const linkCode = /^\/link\s+([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/i
         .exec(text)?.[1]
         ?.toUpperCase();
-      const raw = linkCode ? await connection.getdel(`link_code:${linkCode}`) : null;
-      const linkPayload = parseLinkPayload(raw);
+      void (async () => {
+        const raw = linkCode ? await connection.getdel(`link_code:${linkCode}`) : null;
+        const linkPayload = parseLinkPayload(raw);
 
-      if (!linkPayload?.success || linkPayload.data.channel !== 'discord') {
-        return reply.status(200).send({
-          type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content:
-              'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
-          },
-        });
-      }
-
-      try {
-        await withServiceContext(db, async (tx) => {
-          await tx
-            .insert(schema.channelLinks)
-            .values({
-              userId: linkPayload.data.userId,
+        const sendFollowup = async (text: string, id: string, userId: string | null) => {
+          await outboundQueue.add(
+            'outbound',
+            {
+              userId,
               channel: 'discord',
-              channelUserId: externalUserId,
-            })
-            .onConflictDoUpdate({
-              target: [schema.channelLinks.userId, schema.channelLinks.channel],
-              set: { channelUserId: externalUserId },
-            });
-        });
-      } catch (err) {
-        req.log.warn({ err }, 'discord link failed');
-        return reply.status(200).send({
-          type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content:
-              'I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
-          },
-        });
-      }
+              externalUserId,
+              conversationId,
+              text,
+              discordApplicationId: interaction.application_id,
+              discordInteractionToken: interaction.token,
+              idempotencyKey: id,
+            },
+            { jobId: id },
+          );
+        };
 
-      req.log.info({ userId: linkPayload.data.userId }, 'discord account linked');
+        if (!linkPayload?.success || linkPayload.data.channel !== 'discord') {
+          await sendFollowup(
+            'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
+            `link-failed-${idempotencyKey}`,
+            null,
+          );
+          return;
+        }
+
+        try {
+          await withServiceContext(db, async (tx) => {
+            await tx
+              .insert(schema.channelLinks)
+              .values({
+                userId: linkPayload.data.userId,
+                channel: 'discord',
+                channelUserId: externalUserId,
+              })
+              .onConflictDoUpdate({
+                target: [schema.channelLinks.userId, schema.channelLinks.channel],
+                set: { channelUserId: externalUserId },
+              });
+          });
+        } catch (err) {
+          req.log.warn({ err }, 'discord link failed');
+          await sendFollowup(
+            'I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
+            `link-conflict-${idempotencyKey}`,
+            linkPayload.data.userId,
+          );
+          return;
+        }
+
+        req.log.info({ userId: linkPayload.data.userId }, 'discord account linked');
+        await sendFollowup(
+          'Discord is linked. Your My-Soso agent now knows this account belongs to you.',
+          `link-ok-${idempotencyKey}`,
+          linkPayload.data.userId,
+        );
+      })().catch((err) => req.log.warn({ err }, 'discord link followup failed'));
+
       return reply.status(200).send({
-        type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: 'Discord is linked. Your My-Soso agent now knows this account belongs to you.',
-        },
+        type: discord.DISCORD_RESPONSE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
       });
     }
 

@@ -16,7 +16,7 @@ import {
 } from '@my-soso/queue';
 import type { Logger } from 'pino';
 import type { Database } from '@my-soso/db';
-import { telegram } from '@my-soso/channels';
+import { discord, telegram } from '@my-soso/channels';
 import { handleCommand } from '../commands.js';
 import type { Agent, RunAgentResult } from '../agent/agent.js';
 import { writeAuditEntry } from '../agent/audit.js';
@@ -67,6 +67,7 @@ export function startInboundConsumer({
   db,
   agentModelId,
   telegramBotToken,
+  discordBotToken,
 }: {
   connection: Redis;
   log: Logger;
@@ -78,6 +79,7 @@ export function startInboundConsumer({
    * indicator while processing inbound Telegram messages and refreshes
    * it every 4 seconds until the reply is enqueued. */
   telegramBotToken?: string | undefined;
+  discordBotToken?: string | undefined;
 }): InboundConsumerHandles {
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
   const queueNames = allInboundQueueNames();
@@ -146,18 +148,31 @@ export function startInboundConsumer({
               // indicator auto-clears after ~5s server-side, so we
               // refresh it every 4s until the agent run resolves.
               // Failures are silent (sendTelegramChatAction swallows).
-              let typingTimer: ReturnType<typeof setInterval> | null = null;
+              let telegramTypingTimer: ReturnType<typeof setInterval> | null = null;
+              let discordTypingTimer: ReturnType<typeof setInterval> | null = null;
               if (inbound.channel === 'telegram' && telegramBotToken) {
                 void telegram.sendTelegramChatAction({
                   botToken: telegramBotToken,
                   chatId: inbound.conversationId,
                 });
-                typingTimer = setInterval(() => {
+                telegramTypingTimer = setInterval(() => {
                   void telegram.sendTelegramChatAction({
                     botToken: telegramBotToken,
                     chatId: inbound.conversationId,
                   });
                 }, 4000);
+              }
+              if (inbound.channel === 'discord' && discordBotToken) {
+                void discord.sendDiscordTyping({
+                  botToken: discordBotToken,
+                  channelId: inbound.conversationId,
+                });
+                discordTypingTimer = setInterval(() => {
+                  void discord.sendDiscordTyping({
+                    botToken: discordBotToken,
+                    channelId: inbound.conversationId,
+                  });
+                }, 7000);
               }
               try {
                 const prefs = await loadUserPreferences(db, inbound.userId);
@@ -204,7 +219,8 @@ export function startInboundConsumer({
                   errorMessage: err instanceof Error ? err.message : String(err),
                 });
               } finally {
-                if (typingTimer) clearInterval(typingTimer);
+                if (telegramTypingTimer) clearInterval(telegramTypingTimer);
+                if (discordTypingTimer) clearInterval(discordTypingTimer);
               }
             }
 
