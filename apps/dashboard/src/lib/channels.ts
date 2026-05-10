@@ -14,6 +14,7 @@ export const CHANNELS: ChannelOption[] = [
 ];
 
 const CHOSEN_CHANNEL_KEY = 'mysoso.chosenChannel';
+const SWITCHING_PLATFORM_KEY = 'mysoso.switchingPlatform';
 
 export function readChosenChannel(): Channel | null {
   if (typeof window === 'undefined') return null;
@@ -26,4 +27,15 @@ export function persistChosenChannel(channel: Channel | null) {
   if (typeof window === 'undefined') return;
   if (channel) window.localStorage.setItem(CHOSEN_CHANNEL_KEY, channel);
   else window.localStorage.removeItem(CHOSEN_CHANNEL_KEY);
+}
+
+export function readSwitchingPlatform(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(SWITCHING_PLATFORM_KEY) === 'true';
+}
+
+export function persistSwitchingPlatform(isSwitching: boolean) {
+  if (typeof window === 'undefined') return;
+  if (isSwitching) window.localStorage.setItem(SWITCHING_PLATFORM_KEY, 'true');
+  else window.localStorage.removeItem(SWITCHING_PLATFORM_KEY);
 }

@@ -3,13 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
-import { type Channel, persistChosenChannel, readChosenChannel } from '../lib/channels';
+import {
+  type Channel,
+  persistChosenChannel,
+  persistSwitchingPlatform,
+  readChosenChannel,
+  readSwitchingPlatform,
+} from '../lib/channels';
 import { apiFetch, type ChannelLink } from '../lib/api';
 
 export function EntryPicker() {
   const router = useRouter();
   const { ready, authenticated, login, getAccessToken } = usePrivy();
   const [resolving, setResolving] = useState(false);
+  const [links, setLinks] = useState<ChannelLink[]>([]);
 
   useEffect(() => {
     if (!ready || !authenticated) return;
@@ -21,6 +28,9 @@ export function EntryPicker() {
         if (!token) return;
         const { links } = await apiFetch<{ links: ChannelLink[] }>('/v1/channel-links', token);
         if (cancelled) return;
+        setLinks(links);
+        const isSwitchingPlatform = readSwitchingPlatform();
+        if (isSwitchingPlatform) return;
         if (links.length > 0) {
           // Returning user with at least one linked channel — pin the first
           // linked channel so /hub has a chosenChannel to render against,
@@ -46,6 +56,7 @@ export function EntryPicker() {
   }, [ready, authenticated, getAccessToken, router]);
 
   function selectChannel(channel: Channel) {
+    persistSwitchingPlatform(false);
     persistChosenChannel(channel);
     if (authenticated) {
       router.push('/setup');
@@ -65,6 +76,8 @@ export function EntryPicker() {
       </main>
     );
   }
+
+  const isLinked = (channel: Channel) => links.some((link) => link.channel === channel);
 
   return (
     <main className="entry">
@@ -133,8 +146,9 @@ export function EntryPicker() {
               </span>
               <span className="entry__protocol-text">
                 <strong>Telegram</strong>
-                <small>Ready to connect</small>
+                <small>{isLinked('telegram') ? 'Already linked' : 'Ready to connect'}</small>
               </span>
+              {isLinked('telegram') ? <span className="entry__protocol-state">Linked</span> : null}
               <span className="entry__protocol-arrow">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
@@ -165,8 +179,11 @@ export function EntryPicker() {
               </span>
               <span className="entry__protocol-text">
                 <strong>WhatsApp</strong>
-                <small>Ready to connect</small>
+                <small>{isLinked('whatsapp') ? 'Already linked' : 'Ready to connect'}</small>
               </span>
+              {isLinked('whatsapp') ? (
+                <span className="entry__protocol-state">Linked</span>
+              ) : null}
               <span className="entry__protocol-arrow">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
@@ -197,8 +214,9 @@ export function EntryPicker() {
               </span>
               <span className="entry__protocol-text">
                 <strong>Discord</strong>
-                <small>Ready to connect</small>
+                <small>{isLinked('discord') ? 'Already linked' : 'Ready to connect'}</small>
               </span>
+              {isLinked('discord') ? <span className="entry__protocol-state">Linked</span> : null}
               <span className="entry__protocol-arrow">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path

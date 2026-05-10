@@ -98,6 +98,27 @@ export function SetupHub() {
 
         <article className="hub__card">
           <header className="hub__card-head">
+            <span className="hub__eyebrow">Already Connected</span>
+          </header>
+          {links.length ? (
+            <ul className="hub__linked-list">
+              {links.map((link) => (
+                <li key={link.id}>
+                  <strong>
+                    {CHANNEL_META[link.channel].name}
+                    {link.channel === chosenChannel ? ' (current)' : ''}
+                  </strong>
+                  <span className="hub__mono">{link.channelUserId}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="hub__linked-empty">No channels connected yet.</div>
+          )}
+        </article>
+
+        <article className="hub__card">
+          <header className="hub__card-head">
             <span className="hub__eyebrow">Next After Linking</span>
           </header>
           <div className="hub__next">

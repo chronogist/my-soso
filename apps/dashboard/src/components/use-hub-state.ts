@@ -46,7 +46,12 @@ export const DEFAULT_PREFERENCES: BotPreferences = {
   },
   channelOverrides: {},
 };
-import { persistChosenChannel, readChosenChannel, type Channel } from '../lib/channels';
+import {
+  persistChosenChannel,
+  persistSwitchingPlatform,
+  readChosenChannel,
+  type Channel,
+} from '../lib/channels';
 
 interface PrivyProfile {
   email?: { address?: string };
@@ -477,6 +482,7 @@ export function useHubState(options?: { pollForLink?: boolean }) {
   }
 
   function changePlatform() {
+    persistSwitchingPlatform(true);
     persistChosenChannel(null);
     setChosenChannel(null);
     setLinkCode(null);
@@ -484,6 +490,7 @@ export function useHubState(options?: { pollForLink?: boolean }) {
   }
 
   function signOut() {
+    persistSwitchingPlatform(false);
     persistChosenChannel(null);
     void logout();
   }

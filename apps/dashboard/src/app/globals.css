@@ -636,7 +636,7 @@ h2 {
 .entry__protocol {
   width: 100%;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
@@ -726,6 +726,31 @@ h2 {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(235, 235, 232, 0.6);
+}
+
+.entry__protocol-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(134, 239, 172, 0.16);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #9ae6b4;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.entry__protocol-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px rgba(134, 239, 172, 0.4);
 }
 
 /* ── Hub / post-pick setup ────────────────────────────────────────────── */
