@@ -35,6 +35,9 @@ const applicationId = process.env.DISCORD_APPLICATION_ID;
 const botToken = process.env.DISCORD_BOT_TOKEN;
 const guildId = process.env.DISCORD_GUILD_ID;
 
+console.log(`Registering commands for Application ID: ${applicationId}`);
+if (guildId) console.log(`Targeting Guild ID: ${guildId}`);
+
 if (!applicationId) {
   console.error('DISCORD_APPLICATION_ID is required');
   process.exit(1);
@@ -49,6 +52,8 @@ const commands = [
   {
     name: 'ask',
     description: 'Ask My-Soso a market question',
+    integration_types: [0, 1],
+    contexts: [0, 1, 2],
     options: [
       {
         type: 3,
@@ -61,6 +66,8 @@ const commands = [
   {
     name: 'link',
     description: 'Link this Discord account to My-Soso',
+    integration_types: [0, 1],
+    contexts: [0, 1, 2],
     options: [
       {
         type: 3,
@@ -73,6 +80,8 @@ const commands = [
   {
     name: 'watch',
     description: 'Manage or inspect your watchlist',
+    integration_types: [0, 1],
+    contexts: [0, 1, 2],
     options: [
       {
         type: 3,
@@ -85,6 +94,8 @@ const commands = [
   {
     name: 'alert',
     description: 'Create or inspect your alerts',
+    integration_types: [0, 1],
+    contexts: [0, 1, 2],
     options: [
       {
         type: 3,
@@ -97,6 +108,8 @@ const commands = [
   {
     name: 'memo',
     description: 'Generate a short market memo from your watchlist and recent news',
+    integration_types: [0, 1],
+    contexts: [0, 1, 2],
     options: [
       {
         type: 3,
@@ -115,7 +128,7 @@ const route = guildId
 const res = await fetch(route, {
   method: 'PUT',
   headers: {
-    authorization: `Bot ${botToken}`,
+    authorization: `Bot ${botToken?.trim()}`,
     'content-type': 'application/json',
   },
   body: JSON.stringify(commands),

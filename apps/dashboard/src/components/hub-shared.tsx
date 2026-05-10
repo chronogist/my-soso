@@ -65,10 +65,10 @@ export function channelInstructions(chosenChannel: Channel): ReactNode {
         <>
           {DISCORD_INSTALL_URL ? (
             <a href={DISCORD_INSTALL_URL} target="_blank" rel="noreferrer">
-              Install the MySoSo Discord app
+              Add MySoSo to your Discord apps
             </a>
           ) : (
-            <strong>Install the MySoSo Discord app</strong>
+            <strong>Add MySoSo to your Discord apps</strong>
           )}
         </>
       );
@@ -86,7 +86,7 @@ export function handoffAction(chosenChannel: Channel): ReactNode {
     case 'discord':
       return DISCORD_INSTALL_URL ? (
         <a className="hub__action-link" href={DISCORD_INSTALL_URL} target="_blank" rel="noreferrer">
-          Open Discord Install
+          Open Discord App Install
         </a>
       ) : (
         <span className="hub__action-link hub__action-link--muted">
@@ -108,7 +108,9 @@ export function linkedChannelCopy(chosenChannel: Channel, linkedChannel: Channel
   const name = CHANNEL_META[chosenChannel].name;
   return linkedChannel
     ? `${name} is linked to ${linkedChannel.channelUserId}.`
-    : `Generate a link code, then use the ${name} entrypoint.`;
+    : chosenChannel === 'discord'
+      ? 'Generate a link code, add MySoSo to your Discord apps, then open the DM and run /link with your code.'
+      : `Generate a link code, then use the ${name} entrypoint.`;
 }
 
 export function renderDiscordEndpoint(chosenChannel: Channel) {
