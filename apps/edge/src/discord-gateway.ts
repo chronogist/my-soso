@@ -161,7 +161,7 @@ export function startDiscordGatewayListener(config: Config, log: FastifyBaseLogg
           userId: null,
           externalUserId,
           conversationId,
-          text: 'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
+          text: '🐼 That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
           idempotencyKey: `link-failed-${idempotencyKey}`,
         });
         return;
@@ -187,7 +187,7 @@ export function startDiscordGatewayListener(config: Config, log: FastifyBaseLogg
           userId: linkPayload.data.userId,
           externalUserId,
           conversationId,
-          text: 'I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
+          text: '🐼 I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
           idempotencyKey: `link-conflict-${idempotencyKey}`,
         });
         return;
@@ -197,7 +197,7 @@ export function startDiscordGatewayListener(config: Config, log: FastifyBaseLogg
         userId: linkPayload.data.userId,
         externalUserId,
         conversationId,
-        text: 'Discord is linked. You can just message me normally now.',
+        text: '🐼 Discord is linked. You can just message me normally now.',
         idempotencyKey: `link-ok-${idempotencyKey}`,
       });
       log.info({ userId: linkPayload.data.userId }, 'discord account linked (gateway)');
@@ -216,7 +216,7 @@ export function startDiscordGatewayListener(config: Config, log: FastifyBaseLogg
         userId: null,
         externalUserId,
         conversationId,
-        text: 'I am ready, but this Discord account is not linked yet. Sign in to the My-Soso dashboard, generate a Discord code, then send: link CODE',
+        text: '🐼 I am ready, but this Discord account is not linked yet. Sign in to the My-Soso dashboard, generate a Discord code, then send: link CODE',
         idempotencyKey: `unlinked-${idempotencyKey}`,
       });
       return;

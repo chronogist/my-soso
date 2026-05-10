@@ -182,7 +182,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
         userId: linkPayload.data.userId,
         externalUserId,
         conversationId,
-        text: 'Telegram is linked. Your My-Soso agent now knows this chat belongs to you.',
+          text: '🐼 Telegram is linked. Your My-Soso Panda now knows this chat belongs to you.',
         idempotencyKey: `link-ok-${idempotencyKey}`,
       });
       req.log.info({ userId: linkPayload.data.userId }, 'telegram account linked');
@@ -201,7 +201,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
         userId: null,
         externalUserId,
         conversationId,
-        text: 'I am ready, but this Telegram chat is not linked yet. Sign in to the My-Soso dashboard, generate a Telegram code, then send /link CODE here.',
+        text: '🐼 I am ready, but this Telegram chat is not linked yet. Sign in to the My-Soso dashboard, generate a Telegram code, then send /link CODE here.',
         idempotencyKey: `unlinked-${idempotencyKey}`,
       });
       return reply.status(200).send({ ok: true });

@@ -89,14 +89,14 @@ cp .env.example .env
 ```
 
 ### 3. Local Redis & Tunnel
-The project uses Redis for queues and requires a public tunnel (ngrok) for chat webhooks.
+The project uses Redis for queues. For Telegram/WhatsApp webhooks you also need a public tunnel (ngrok) so the platforms can reach your local Edge service.
 
 **Start Redis:**
 ```bash
 pnpm redis:up
 ```
 
-**Start Tunnel (Required for Telegram/Discord/WhatsApp):**
+**Start Tunnel (Required for Telegram/WhatsApp):**
 In a separate terminal:
 ```bash
 ngrok http 3002
@@ -162,8 +162,6 @@ Full feature checklists live in [`plan.md`](plan.md).
 
 ## Status
 
-**Wave 1 / Phases 1–2 complete.** The full Edge → queue → Worker → Telegram round-trip is wired; Privy login is scaffolded; the dashboard can generate Telegram link codes; `/link CODE` writes `channel_links`; and normal Telegram messages now resolve to a real `userId` before entering the agent path.
-
-Phase 3 (SoSoValue provider + cache + prefetcher + LLM agent) is next. Full progress lives in [`plan.md`](plan.md), which is the resume point.
+**Wave 1 / Phases 1–4 complete; Phase 5 in progress.** Telegram/Discord/WhatsApp are wired through Edge → Redis → Worker with SoSoValue-backed answers, watchlists, alerts, and digests. Discord supports both slash commands and “normal DM chat” via a Gateway listener (Message Content Intent required).
 
 Read [`architecture.md`](architecture.md) before writing code. Update it before changing something it describes.

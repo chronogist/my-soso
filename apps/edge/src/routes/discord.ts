@@ -156,7 +156,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
 
         if (!linkPayload?.success || linkPayload.data.channel !== 'discord') {
           await sendFollowup(
-            'That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
+            '🐼 That link code is expired or invalid. Generate a fresh Discord code in the dashboard.',
             `link-failed-${idempotencyKey}`,
             null,
           );
@@ -180,7 +180,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
         } catch (err) {
           req.log.warn({ err }, 'discord link failed');
           await sendFollowup(
-            'I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
+            '🐼 I could not link this Discord account. It may already be connected somewhere else. Generate a fresh code and try again.',
             `link-conflict-${idempotencyKey}`,
             linkPayload.data.userId,
           );
@@ -189,7 +189,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
 
         req.log.info({ userId: linkPayload.data.userId }, 'discord account linked');
         await sendFollowup(
-          'Discord is linked. Your My-Soso agent now knows this account belongs to you.',
+          '🐼 Discord is linked. Your My-Soso Panda now knows this account belongs to you.',
           `link-ok-${idempotencyKey}`,
           linkPayload.data.userId,
         );
@@ -212,7 +212,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
         type: discord.DISCORD_RESPONSE.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content:
-            'I am ready, but this Discord account is not linked yet. Sign in to the My-Soso dashboard, generate a Discord code, then run /link CODE here.',
+            '🐼 I am ready, but this Discord account is not linked yet. Sign in to the My-Soso dashboard, generate a Discord code, then run /link CODE here.',
         },
       });
     }

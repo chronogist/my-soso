@@ -80,6 +80,8 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now par
 - [x] Discord HTTP Interactions adapter with deferred response (`type: 5`)
 - [x] Discord slash commands: `/ask`, `/watch`, `/alert`, `/link`
 - [ ] Discord `/memo`
+- [x] Discord Gateway listener for “normal DM chat” (no slash prefix)
+- [x] Discord typing indicator during long-running agent replies (Gateway path + slash-command path via followups)
 - [x] WhatsApp Cloud API adapter with template selection (24h-window logic)
 - [ ] Pre-approve WhatsApp templates: digest, alert, link-confirmation
 - [x] Compliance classifier + outbound fallback forbidding `recommendation`/`execution`-class replies
@@ -124,7 +126,7 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now par
 1. **Finish the setup-to-chat handoff**
    - Wire the dashboard copy/actions to real production entrypoints for each platform.
    - Telegram: bot username + webhook registration.
-   - Discord: app install, Interactions endpoint, slash-command registration, `/memo`.
+   - Discord: app install, Gateway DMs (for natural chat), Interactions endpoint + slash-command registration, `/memo`.
    - WhatsApp: real business number, webhook verification, approved templates.
 
 2. **Add user-facing controls that are already supported in the backend**
@@ -140,9 +142,13 @@ Wave 1 is split into 5 phases. Phases 1–4 are complete, and Phase 5 is now par
 
 1. `pnpm install`
 2. Copy `.env.example` → `.env` and fill in: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `REDIS_URL`, `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`), `SOSOVALUE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus Sentry optional.
-3. `pnpm --filter @my-soso/db exec tsx scripts/apply-migrations.ts` to apply the SQL migrations to Supabase (idempotent; tracked via `__migrations`).
-4. `pnpm dev:dashboard`, `pnpm dev:api`, `pnpm dev:edge`, and `pnpm dev:worker` in separate terminals.
+3. `pnpm --filter @my-soso/db exec tsx scripts/apply-migrations.ts` to apply the SQL migrations (idempotent; tracked via `__migrations`).
+4. Start services:
+   - `pnpm dev` (starts all services), or run them individually: `pnpm dev:dashboard`, `pnpm dev:api`, `pnpm dev:edge`, `pnpm dev:worker`
 5. Open the dashboard, choose a platform, and use the `/setup` flow to generate a link code.
-6. Expose Edge publicly and register the appropriate webhook / interactions endpoint for Telegram, Discord, and WhatsApp.
-7. Register Discord slash commands with `pnpm discord:register`.
+6. Telegram/WhatsApp dev requires a public HTTPS tunnel to Edge:
+   - Run `pnpm tunnel` (ngrok) and restart Edge so webhooks can be registered.
+7. Discord:
+   - Register slash commands with `node apps/edge/scripts/register-discord-commands.js`
+   - For “normal DM chat” via Gateway, enable Discord’s Message Content Intent in the developer portal and ensure `DISCORD_BOT_TOKEN` is set for both Edge and Worker.
 8. Finish the remaining Phase 5 items in the “What’s next to build” section above.
