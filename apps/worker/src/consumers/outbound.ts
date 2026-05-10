@@ -19,6 +19,7 @@ export interface StartOutboundConsumerOptions {
   connection: Redis;
   log: Logger;
   telegramBotToken: string;
+  discordBotToken?: string;
   whatsappAccessToken?: string;
   whatsappPhoneNumberId?: string;
 }
@@ -33,6 +34,7 @@ export function startOutboundConsumer({
   connection,
   log,
   telegramBotToken,
+  discordBotToken,
   whatsappAccessToken,
   whatsappPhoneNumberId,
 }: StartOutboundConsumerOptions): OutboundConsumerHandles {
@@ -66,14 +68,30 @@ export function startOutboundConsumer({
             return;
           }
           case 'discord':
-            if (!out.discordApplicationId || !out.discordInteractionToken) {
-              log.error({ jobId: job.id }, 'discord outbound missing interaction metadata');
-              throw new Error('discord outbound missing interaction metadata');
-            }
-            {
+            if (out.discordApplicationId && out.discordInteractionToken) {
               const result = await discord.sendDiscordFollowupMessage({
                 applicationId: out.discordApplicationId,
                 interactionToken: out.discordInteractionToken,
+                text: out.text,
+              });
+              if (!result.ok) {
+                log.error(
+                  { jobId: job.id, description: result.description },
+                  'discord send failed',
+                );
+                throw new Error(result.description);
+              }
+              log.info({ jobId: job.id }, 'discord send ok');
+              return;
+            }
+            if (!discordBotToken) {
+              log.error({ jobId: job.id }, 'discord outbound missing bot token');
+              throw new Error('discord outbound missing bot token');
+            }
+            {
+              const result = await discord.sendDiscordChannelMessage({
+                botToken: discordBotToken,
+                channelId: out.conversationId,
                 text: out.text,
               });
               if (!result.ok) {

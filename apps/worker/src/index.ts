@@ -33,11 +33,13 @@ function main() {
     db: stack.db,
     agentModelId: config.OPENROUTER_MODEL,
     telegramBotToken: config.TELEGRAM_BOT_TOKEN,
+    ...(config.DISCORD_BOT_TOKEN ? { discordBotToken: config.DISCORD_BOT_TOKEN } : {}),
   });
   const outbound = startOutboundConsumer({
     connection,
     log,
     telegramBotToken: config.TELEGRAM_BOT_TOKEN,
+    ...(config.DISCORD_BOT_TOKEN ? { discordBotToken: config.DISCORD_BOT_TOKEN } : {}),
     ...(config.WHATSAPP_ACCESS_TOKEN ? { whatsappAccessToken: config.WHATSAPP_ACCESS_TOKEN } : {}),
     ...(config.WHATSAPP_PHONE_NUMBER_ID
       ? { whatsappPhoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID }

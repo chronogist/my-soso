@@ -3,10 +3,20 @@ import { z } from 'zod';
 // Treat empty-string env vars as missing — devs commonly leave optional
 // keys defined-but-blank in .env, and zod's .url()/.min(1) would otherwise
 // reject the whole config at boot.
+function stripInlineComment(v: unknown) {
+  if (typeof v !== 'string') return v;
+  return v.trim().replace(/\s+#.*$/, '');
+}
 const optionalString = () =>
-  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional());
+  z.preprocess((v) => {
+    const cleaned = stripInlineComment(v);
+    return cleaned === '' ? undefined : cleaned;
+  }, z.string().min(1).optional());
 const optionalUrl = () =>
-  z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+  z.preprocess((v) => {
+    const cleaned = stripInlineComment(v);
+    return cleaned === '' ? undefined : cleaned;
+  }, z.string().url().optional());
 
 const ConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -15,7 +25,8 @@ const ConfigSchema = z.object({
   REDIS_URL: z.string().url(),
   SENTRY_DSN: optionalUrl(),
   SENTRY_ENVIRONMENT: z.string().default('development'),
-  TELEGRAM_BOT_TOKEN: z.string().min(1),
+  TELEGRAM_BOT_TOKEN: z.preprocess(stripInlineComment, z.string().min(1)),
+  DISCORD_BOT_TOKEN: optionalString(),
   WHATSAPP_ACCESS_TOKEN: optionalString(),
   WHATSAPP_PHONE_NUMBER_ID: optionalString(),
 
