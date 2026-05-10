@@ -17,6 +17,18 @@ export interface TelegramSendResult {
   message_id?: number;
 }
 
+function escapeTelegramHtml(text: string): string {
+  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function formatTelegramText(text: string): string {
+  const escaped = escapeTelegramHtml(text);
+  return escaped
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\*\*(.+?)\*\*/gs, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
 /**
  * Send a text message via Telegram's Bot API. Throws on transport errors;
  * returns `{ ok: false, description }` on Telegram-side errors so callers
@@ -29,7 +41,9 @@ export async function sendTelegramMessage(
 
   const body: Record<string, unknown> = {
     chat_id: opts.chatId,
-    text: opts.text,
+    text: formatTelegramText(opts.text),
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
   };
 
   if (opts.buttons && opts.buttons.length > 0) {
