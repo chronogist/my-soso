@@ -3,10 +3,20 @@ import { z } from 'zod';
 // Treat empty-string env vars as missing — devs commonly leave optional
 // keys defined-but-blank in .env, and zod's .url()/.min(1) would otherwise
 // reject the whole config at boot.
+function stripInlineComment(v: unknown) {
+  if (typeof v !== 'string') return v;
+  return v.trim().replace(/\s+#.*$/, '');
+}
 const optionalString = () =>
-  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional());
+  z.preprocess((v) => {
+    const cleaned = stripInlineComment(v);
+    return cleaned === '' ? undefined : cleaned;
+  }, z.string().min(1).optional());
 const optionalUrl = () =>
-  z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional());
+  z.preprocess((v) => {
+    const cleaned = stripInlineComment(v);
+    return cleaned === '' ? undefined : cleaned;
+  }, z.string().url().optional());
 
 const ConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -20,6 +30,12 @@ const ConfigSchema = z.object({
   TELEGRAM_BOT_TOKEN: optionalString(),
   TELEGRAM_WEBHOOK_URL: optionalUrl(),
   DISCORD_PUBLIC_KEY: optionalString(),
+  DISCORD_BOT_TOKEN: optionalString(),
+  DISCORD_GATEWAY_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  DISCORD_GATEWAY_INTENTS: z.coerce.number().int().positive().optional(),
   WHATSAPP_VERIFY_TOKEN: optionalString(),
   WHATSAPP_APP_SECRET: optionalString(),
 });

@@ -2,12 +2,20 @@ import { loadConfig } from './config.js';
 import { initSentry } from './sentry.js';
 import { buildServer } from './server.js';
 import { autoRegisterTelegramWebhook } from './telegram-auto-register.js';
+import { startDiscordGatewayListener } from './discord-gateway.js';
 
 async function main() {
   const config = loadConfig();
   initSentry(config);
 
   const app = buildServer(config);
+
+  const discordGateway = startDiscordGatewayListener(config, app.log);
+  if (discordGateway) {
+    app.addHook('onClose', async () => {
+      await discordGateway.close();
+    });
+  }
 
   try {
     await app.listen({ host: '0.0.0.0', port: config.PORT });
