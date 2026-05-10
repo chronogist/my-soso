@@ -5,6 +5,7 @@ import {
   AccountSummaryCard,
   CHANNEL_META,
   LinkCodeCard,
+  NotificationTray,
   channelInstructions,
   handoffAction,
   linkedChannelCopy,
@@ -21,6 +22,8 @@ export function SetupHub() {
     links,
     linkCode,
     error,
+    notifications,
+    dismissNotification,
     isPending,
     initialLoaded,
     generateLinkCode,
@@ -56,6 +59,7 @@ export function SetupHub() {
 
   return (
     <main className="hub">
+      <NotificationTray notifications={notifications} onDismiss={dismissNotification} />
       <div className="hub__brand">
         <span className="entry__brand-dot" />
         MySoSo

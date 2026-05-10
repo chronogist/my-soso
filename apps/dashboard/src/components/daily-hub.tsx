@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ChangeEvent } from 'react';
-import type { BotPreferences, Tone, Verbosity, NewsStrength } from '../lib/api';
-import { AccountSummaryCard, CHANNEL_META, handoffAction } from './hub-shared';
+import type { BotPreferences, Tone, Verbosity, NewsStrength, WatchlistItem } from '../lib/api';
+import { AccountSummaryCard, CHANNEL_META, NotificationTray, handoffAction } from './hub-shared';
 import { DIGEST_OPTIONS, PRICE_OP_OPTIONS, formatAlertDetail, useHubState } from './use-hub-state';
 
 type Tab = 'overview' | 'alerts' | 'personality' | 'coverage' | 'channels';
@@ -62,6 +62,87 @@ const COVERAGE_OPTIONS: { key: keyof BotPreferences['coverage']; label: string; 
 ];
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const PRICE_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 2,
+});
+const PRICE_FORMATTER_SMALL = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 6,
+});
+
+function formatPrice(priceUsd: number) {
+  return priceUsd >= 1 ? PRICE_FORMATTER.format(priceUsd) : PRICE_FORMATTER_SMALL.format(priceUsd);
+}
+
+function formatUpdatedAt(asOf: string) {
+  const deltaMs = Date.now() - new Date(asOf).getTime();
+  if (Number.isNaN(deltaMs) || deltaMs < 0) return 'Updated just now';
+  const minutes = Math.floor(deltaMs / 60_000);
+  if (minutes < 1) return 'Updated just now';
+  if (minutes < 60) return `Updated ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Updated ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `Updated ${days}d ago`;
+}
+
+function WatchlistRow({
+  item,
+  isPending,
+  isRemoving,
+  onRemove,
+}: {
+  item: WatchlistItem;
+  isPending: boolean;
+  isRemoving: boolean;
+  onRemove: (symbol: string) => void;
+}) {
+  const change = item.market?.change24hPct ?? null;
+  const changeClass =
+    change === null ? '' : change >= 0 ? 'hub__asset-change--up' : 'hub__asset-change--down';
+
+  return (
+    <li>
+      <span className="hub__asset-icon">{item.symbol.slice(0, 1)}</span>
+      <div className="hub__asset-body">
+        <div className="hub__asset-topline">
+          <div className="hub__asset-heading">
+            <span className="hub__asset-name">{item.symbol}</span>
+            <span className="hub__asset-tag">{item.assetKind}</span>
+          </div>
+          <span className={`hub__asset-change ${changeClass}`}>
+            {change === null ? 'No change yet' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`}
+          </span>
+        </div>
+        <div className="hub__asset-bottomline">
+          <strong className="hub__asset-price">
+            {item.market ? formatPrice(item.market.priceUsd) : 'Price unavailable'}
+          </strong>
+          <span className="hub__asset-updated">
+            {isRemoving
+              ? `Removing ${item.symbol}...`
+              : item.market
+                ? formatUpdatedAt(item.market.asOf)
+                : 'Refresh on next load'}
+          </span>
+        </div>
+      </div>
+      <button
+        className="hub__icon-btn hub__icon-btn--danger"
+        aria-label={isRemoving ? `Removing ${item.symbol}` : `Remove ${item.symbol}`}
+        onClick={() => onRemove(item.symbol)}
+        type="button"
+        disabled={isPending || isRemoving}
+      >
+        {isRemoving ? '…' : '×'}
+      </button>
+    </li>
+  );
+}
 
 export function DailyHub() {
   const state = useHubState();
@@ -77,6 +158,11 @@ export function DailyHub() {
     digestSchedule,
     symbol,
     setSymbol,
+    symbolSuggestions,
+    isLoadingSymbolSuggestions,
+    isAddingWatchlistItem,
+    removingWatchlistSymbol,
+    chooseSymbolSuggestion,
     alertSymbol,
     setAlertSymbol,
     alertKind,
@@ -90,6 +176,8 @@ export function DailyHub() {
     preferences,
     savePreferences,
     error,
+    notifications,
+    dismissNotification,
     isPending,
     initialLoaded,
     addWatchlistItem,
@@ -131,6 +219,7 @@ export function DailyHub() {
 
   return (
     <main className="hub">
+      <NotificationTray notifications={notifications} onDismiss={dismissNotification} />
       <div className="hub__brand">
         <span className="entry__brand-dot" />
         MySoSo
@@ -144,31 +233,48 @@ export function DailyHub() {
             <span className="hub__eyebrow">Watchlist</span>
           </header>
           <form className="hub__add" onSubmit={addWatchlistItem}>
-            <input
-              value={symbol}
-              onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-              placeholder="Add symbol (e.g. BTC)"
-              aria-label="Asset symbol"
-            />
+            <div className="hub__typeahead">
+              <input
+                value={symbol}
+                onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+                placeholder="Add symbol (e.g. BTC)"
+                aria-label="Asset symbol"
+                autoComplete="off"
+              />
+              {(symbolSuggestions.length > 0 || (isLoadingSymbolSuggestions && symbol.trim())) && (
+                <div className="hub__suggestions" role="listbox" aria-label="Suggested symbols">
+                  {isLoadingSymbolSuggestions && symbolSuggestions.length === 0 ? (
+                    <div className="hub__suggestion-empty">Searching symbols...</div>
+                  ) : (
+                    symbolSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.symbol}
+                        className="hub__suggestion"
+                        onClick={() => chooseSymbolSuggestion(suggestion.symbol)}
+                        type="button"
+                      >
+                        <span className="hub__suggestion-symbol">{suggestion.symbol}</span>
+                        <span className="hub__suggestion-name">{suggestion.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button type="submit" disabled={!symbol.trim() || isPending}>
-              + Add
+              {isAddingWatchlistItem ? 'Adding...' : '+ Add'}
             </button>
           </form>
           <ul className="hub__watchlist">
             {watchlist?.items.length ? (
               watchlist.items.map((item) => (
-                <li key={item.id}>
-                  <span className="hub__asset-icon">{item.symbol.slice(0, 1)}</span>
-                  <span className="hub__asset-name">{item.symbol}</span>
-                  <button
-                    className="hub__icon-btn hub__icon-btn--danger"
-                    aria-label={`Remove ${item.symbol}`}
-                    onClick={() => removeWatchlistItem(item.symbol)}
-                    type="button"
-                  >
-                    ×
-                  </button>
-                </li>
+                <WatchlistRow
+                  key={item.id}
+                  item={item}
+                  isPending={isPending}
+                  isRemoving={removingWatchlistSymbol === item.symbol}
+                  onRemove={removeWatchlistItem}
+                />
               ))
             ) : (
               <li className="hub__watchlist-empty">No assets watched yet.</li>

@@ -4,6 +4,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { ApiUser, ChannelLink, LinkCode } from '../lib/api';
 import type { Channel } from '../lib/channels';
 
+export interface HubNotification {
+  id: string;
+  kind: 'loading' | 'success' | 'error';
+  message: string;
+}
+
 const TELEGRAM_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? 'mysoso_agent_bot';
 const TELEGRAM_BOT_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? 'https://t.me/mysoso_agent_bot';
@@ -157,6 +163,42 @@ export function LinkCodeCard({ code }: { code: LinkCode }) {
         </svg>
         Expires in {mm}:{ss}
       </span>
+    </div>
+  );
+}
+
+export function NotificationTray({
+  notifications,
+  onDismiss,
+}: {
+  notifications: HubNotification[];
+  onDismiss: (id: string) => void;
+}) {
+  if (notifications.length === 0) return null;
+
+  return (
+    <div className="hub__toast-stack" aria-live="polite" aria-atomic="true">
+      {notifications.map((notification) => (
+        <div
+          key={notification.id}
+          className={`hub__toast hub__toast--${notification.kind}`}
+          role="status"
+        >
+          <span>{notification.message}</span>
+          {notification.kind === 'loading' ? (
+            <span className="hub__toast-spinner" aria-hidden />
+          ) : (
+            <button
+              className="hub__toast-close"
+              onClick={() => onDismiss(notification.id)}
+              type="button"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
