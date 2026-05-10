@@ -14,6 +14,8 @@ const ConfigSchema = z
     PRIVY_JWT_VERIFICATION_KEY: z.string().min(1).optional(),
     PRIVY_JWKS_URL: z.string().url().optional(),
     LINK_CODE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+    SOSOVALUE_API_KEY: z.string().min(1).optional(),
+    SOSOVALUE_BASE_URL: z.string().url().optional(),
   })
   .refine((c) => c.PRIVY_JWKS_URL ?? c.PRIVY_JWT_VERIFICATION_KEY, {
     message: 'Set PRIVY_JWKS_URL (preferred) or PRIVY_JWT_VERIFICATION_KEY',

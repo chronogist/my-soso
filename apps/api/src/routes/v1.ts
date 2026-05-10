@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { schema, withServiceContext, withTenantUser, type Database } from '@my-soso/db';
+import { SoSoValueProvider, type Price } from '@my-soso/providers';
 import type { Redis } from '@my-soso/queue';
 import { z } from 'zod';
 import type { Config } from '../config.js';
@@ -14,6 +15,10 @@ const SessionSyncSchema = z.object({
 });
 const LinkCodeSchema = z.object({ channel: ChannelSchema });
 const DigestScheduleSchema = z.enum(['off', 'daily', 'weekly']);
+const SymbolSearchSchema = z.object({
+  q: z.string().trim().min(1).max(40),
+  limit: z.coerce.number().int().min(1).max(12).default(8),
+});
 const SymbolSchema = z
   .string()
   .trim()
@@ -383,6 +388,13 @@ export function registerV1Routes(
     db: Database;
   },
 ): void {
+  const marketData = config.SOSOVALUE_API_KEY
+    ? new SoSoValueProvider({
+        apiKey: config.SOSOVALUE_API_KEY,
+        ...(config.SOSOVALUE_BASE_URL ? { baseUrl: config.SOSOVALUE_BASE_URL } : {}),
+      })
+    : null;
+
   app.post('/v1/session', async (req) => {
     const claims = await requireAuth(req, verifier);
     const input = SessionSyncSchema.parse(req.body ?? {});
@@ -394,6 +406,15 @@ export function registerV1Routes(
     const claims = await requireAuth(req, verifier);
     const user = await requireUserForPrivy(db, claims);
     return { user: publicUser(user) };
+  });
+
+  app.get('/v1/markets/symbols', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    await requireUserForPrivy(db, claims);
+    const input = SymbolSearchSchema.parse(req.query ?? {});
+    if (!marketData) return { items: [] };
+    const items = await marketData.searchSymbols(input.q, { limit: input.limit });
+    return { items };
   });
 
   app.post('/v1/link-codes', async (req) => {
@@ -455,6 +476,10 @@ export function registerV1Routes(
         .where(eq(schema.watchlistItems.watchlistId, watchlist.id))
         .orderBy(schema.watchlistItems.createdAt),
     );
+    const prices =
+      marketData && items.length > 0
+        ? await marketData.getPrices(items.map((item) => item.assetSymbol))
+        : new Map<string, Price>();
 
     return {
       watchlist: {
@@ -466,6 +491,15 @@ export function registerV1Routes(
           symbol: item.assetSymbol,
           assetKind: item.assetKind,
           createdAt: item.createdAt.toISOString(),
+          market: (() => {
+            const price = prices.get(item.assetSymbol);
+            if (!price) return null;
+            return {
+              priceUsd: price.price,
+              change24hPct: price.change24hPct,
+              asOf: price.asOf.toISOString(),
+            };
+          })(),
         })),
       },
     };

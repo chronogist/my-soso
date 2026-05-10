@@ -1,4 +1,4 @@
-import type { MarketDataProvider } from '../market-data.js';
+import type { MarketDataProvider, MarketSymbol } from '../market-data.js';
 import type { NewsProvider } from '../news.js';
 import {
   UnknownSymbolError,
@@ -91,6 +91,36 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
       if (r.status === 'fulfilled') out.set(symbols[i]!.toUpperCase(), r.value);
     });
     return out;
+  }
+
+  async searchSymbols(
+    query: string,
+    opts: { limit?: number } = {},
+  ): Promise<readonly MarketSymbol[]> {
+    const needle = query.trim().toUpperCase();
+    if (!needle) return [];
+    const limit = opts.limit ?? 8;
+    const map = await this.getCurrencyMap();
+    return Array.from(map.bySymbol.values())
+      .filter((currency) => {
+        const symbol = currency.symbol.toUpperCase();
+        const name = currency.name.toUpperCase();
+        return symbol.includes(needle) || name.includes(needle);
+      })
+      .sort((a, b) => {
+        const aSymbol = a.symbol.toUpperCase();
+        const bSymbol = b.symbol.toUpperCase();
+        const aStarts = aSymbol.startsWith(needle) ? 0 : 1;
+        const bStarts = bSymbol.startsWith(needle) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        if (aSymbol.length !== bSymbol.length) return aSymbol.length - bSymbol.length;
+        return aSymbol.localeCompare(bSymbol);
+      })
+      .slice(0, limit)
+      .map((currency) => ({
+        symbol: currency.symbol.toUpperCase(),
+        name: currency.name,
+      }));
   }
 
   async getETFFlow(symbol: string): Promise<ETFFlow> {

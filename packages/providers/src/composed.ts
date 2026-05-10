@@ -1,7 +1,7 @@
 import type { TokenBucket } from '@my-soso/queue';
 import type { ProviderCache } from './cache.js';
 import type { BudgetTracker } from './budget.js';
-import type { MarketDataProvider } from './market-data.js';
+import type { MarketDataProvider, MarketSymbol } from './market-data.js';
 import type { NewsProvider } from './news.js';
 import { RateLimitedError, type ETFFlow, type Index, type NewsItem, type Price } from './types.js';
 
@@ -111,6 +111,16 @@ export function composeProvider(opts: ComposeProviderOptions): MarketDataProvide
         }
       }
       return out;
+    },
+
+    searchSymbols: (query, searchOpts) => {
+      const normalized = query.trim().toUpperCase();
+      const limit = searchOpts?.limit ?? 8;
+      return memoize<readonly MarketSymbol[]>(
+        `${ns}:symbols:${normalized}:${limit}`,
+        ttls.indexSeconds,
+        () => opts.inner.searchSymbols(query, { limit }),
+      );
     },
 
     getETFFlow: (symbol) =>

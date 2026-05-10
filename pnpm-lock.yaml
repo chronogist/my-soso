@@ -53,6 +53,9 @@ importers:
       '@my-soso/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@my-soso/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       '@my-soso/queue':
         specifier: workspace:*
         version: link:../../packages/queue

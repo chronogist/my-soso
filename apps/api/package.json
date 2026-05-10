@@ -15,6 +15,7 @@
   "dependencies": {
     "@fastify/cors": "^11.0.0",
     "@my-soso/db": "workspace:*",
+    "@my-soso/providers": "workspace:*",
     "@my-soso/queue": "workspace:*",
     "@my-soso/shared-types": "workspace:*",
     "@sentry/node": "^10.51.0",

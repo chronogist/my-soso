@@ -1,5 +1,10 @@
 import type { ETFFlow, Index, Price } from './types.js';
 
+export interface MarketSymbol {
+  symbol: string;
+  name: string;
+}
+
 /**
  * Read-only market data. Implementations are expected to handle their
  * own caching, rate limiting, and budget tracking; the agent layer
@@ -20,6 +25,8 @@ export interface MarketDataProvider {
    * canonical (uppercase) symbol; missing symbols are simply absent.
    */
   getPrices(symbols: readonly string[]): Promise<ReadonlyMap<string, Price>>;
+
+  searchSymbols(query: string, opts?: { limit?: number }): Promise<readonly MarketSymbol[]>;
 
   getETFFlow(symbol: string): Promise<ETFFlow>;
 

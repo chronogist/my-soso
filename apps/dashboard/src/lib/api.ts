@@ -67,11 +67,21 @@ export interface LinkCode {
   expiresInSeconds: number;
 }
 
+export interface MarketSymbolSuggestion {
+  symbol: string;
+  name: string;
+}
+
 export interface WatchlistItem {
   id: string;
   symbol: string;
   assetKind: string;
   createdAt: string;
+  market: {
+    priceUsd: number;
+    change24hPct: number | null;
+    asOf: string;
+  } | null;
 }
 
 export interface Watchlist {
@@ -98,15 +108,17 @@ export interface Alert {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('authorization', `Bearer ${token}`);
+  if (init.body !== undefined && !headers.has('content-type')) {
+    headers.set('content-type', 'application/json');
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${token}`,
-        ...init.headers,
-      },
+      headers,
     });
   } catch {
     throw new Error(`API unreachable at ${API_BASE}. Is the API server running?`);
