@@ -75,6 +75,40 @@ Lean by design. Eight integrations, no ceremony.
 
 End-to-end **TypeScript**. Monorepo via pnpm workspaces + Turborepo. Drizzle ORM. grammY for Telegram. discord-interactions for Discord. WhatsApp Business Cloud API directly.
 
+## Getting Started
+
+### 1. Prerequisites
+- **Node.js** (>=22.0.0)
+- **pnpm** (>=10.0.0)
+- **Docker** (for local Redis)
+
+### 2. Environment Setup
+Copy `.env.example` to `.env` and fill in the required keys:
+```bash
+cp .env.example .env
+```
+
+### 3. Local Redis & Tunnel
+The project uses Redis for queues and requires a public tunnel (ngrok) for chat webhooks.
+
+**Start Redis:**
+```bash
+pnpm redis:up
+```
+
+**Start Tunnel (Required for Telegram/Discord/WhatsApp):**
+In a separate terminal:
+```bash
+ngrok http 3002
+```
+The Edge service will automatically detect the ngrok URL and register it with Telegram on boot.
+
+### 4. Install & Dev
+```bash
+pnpm install
+pnpm dev
+```
+
 ---
 
 ## Project structure
