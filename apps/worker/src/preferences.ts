@@ -12,7 +12,7 @@ import { z } from 'zod';
  * Stored values may be partial / legacy — always merge with defaults
  * before reading individual fields.
  */
-const Tone = z.enum(['concise', 'casual', 'formal']);
+const Tone = z.enum(['concise', 'detailed', 'casual', 'formal']);
 const Verbosity = z.enum(['short', 'normal', 'long']);
 const NewsStrength = z.enum(['major_only', 'portfolio', 'all']);
 const DigestSection = z.enum(['prices', 'news', 'etf_flows', 'indices', 'macro']);
