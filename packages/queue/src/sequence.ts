@@ -10,9 +10,18 @@ import type { Redis } from 'ioredis';
  */
 const SEQ_KEY_PREFIX = 'seq:conversation';
 const PROCESSED_KEY_PREFIX = 'processed:conversation';
+/**
+ * Sequence bookkeeping only matters while a conversation is active or
+ * while a recent retry could still arrive. Expire idle conversations so
+ * one-off chats do not accumulate forever in Redis.
+ */
+const CONVERSATION_SEQ_TTL_SECONDS = 14 * 24 * 60 * 60;
 
-export function nextConversationSeq(redis: Redis, conversationId: string): Promise<number> {
-  return redis.incr(`${SEQ_KEY_PREFIX}:${conversationId}`);
+export async function nextConversationSeq(redis: Redis, conversationId: string): Promise<number> {
+  const key = `${SEQ_KEY_PREFIX}:${conversationId}`;
+  const seqNo = await redis.incr(key);
+  await redis.expire(key, CONVERSATION_SEQ_TTL_SECONDS);
+  return seqNo;
 }
 
 export async function lastProcessedSeq(redis: Redis, conversationId: string): Promise<number> {
@@ -30,6 +39,7 @@ local current = tonumber(redis.call("GET", KEYS[1]) or "0")
 local next = tonumber(ARGV[1])
 if next == current + 1 then
   redis.call("SET", KEYS[1], next)
+  redis.call("EXPIRE", KEYS[1], tonumber(ARGV[2]))
   return 1
 else
   return 0
@@ -46,6 +56,7 @@ export async function advanceProcessedSeq(
     1,
     `${PROCESSED_KEY_PREFIX}:${conversationId}`,
     String(seqNo),
+    String(CONVERSATION_SEQ_TTL_SECONDS),
   )) as number;
   return result === 1;
 }
