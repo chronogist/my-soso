@@ -1,0 +1,15 @@
+app = "my-soso"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  LOG_LEVEL = "info"
+
+[processes]
+  app = "pnpm --filter @my-soso/worker start"
+
+[deploy]
+  strategy = "immediate"
