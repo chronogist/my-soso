@@ -181,6 +181,7 @@ export function startInboundConsumer({
                   userMessage: inbound.text,
                   conversationId: inbound.conversationId,
                   userId: inbound.userId,
+                  persona: prefs.persona,
                   tone: channelTone ?? prefs.tone,
                   verbosity: prefs.verbosity,
                   language: prefs.language,

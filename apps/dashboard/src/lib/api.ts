@@ -11,11 +11,13 @@ export interface ApiUser {
 export type DigestSchedule = 'off' | 'daily' | 'weekly';
 export type AlertKind = 'price' | 'news' | 'etf_flow' | 'index_move' | 'sentiment' | 'macro';
 export type PriceOp = 'lt' | 'lte' | 'gt' | 'gte';
+export type Persona = 'panda' | 'classic' | 'shark' | 'zen';
 export type Tone = 'concise' | 'detailed' | 'casual' | 'formal';
 export type Verbosity = 'short' | 'normal' | 'long';
 export type NewsStrength = 'major_only' | 'portfolio' | 'all';
 
 export interface BotPreferences {
+  persona: Persona;
   tone: Tone;
   verbosity: Verbosity;
   language: string;

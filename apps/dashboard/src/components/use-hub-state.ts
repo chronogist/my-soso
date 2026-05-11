@@ -19,6 +19,7 @@ import {
 import type { HubNotification } from './hub-shared';
 
 export const DEFAULT_PREFERENCES: BotPreferences = {
+  persona: 'panda',
   tone: 'concise',
   verbosity: 'normal',
   language: 'en',

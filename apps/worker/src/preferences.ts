@@ -14,11 +14,13 @@ import { z } from 'zod';
  */
 const Tone = z.enum(['concise', 'detailed', 'casual', 'formal']);
 const Verbosity = z.enum(['short', 'normal', 'long']);
+const Persona = z.enum(['panda', 'classic', 'shark', 'zen']);
 const NewsStrength = z.enum(['major_only', 'portfolio', 'all']);
 const DigestSection = z.enum(['prices', 'news', 'etf_flows', 'indices', 'macro']);
 const Channel = z.enum(['telegram', 'discord', 'whatsapp']);
 
 const BotPreferencesSchema = z.object({
+  persona: Persona.default('panda'),
   tone: Tone.default('concise'),
   verbosity: Verbosity.default('normal'),
   language: z.string().default('en'),
@@ -95,6 +97,7 @@ const BotPreferencesSchema = z.object({
 export type BotPreferences = z.infer<typeof BotPreferencesSchema>;
 export type Tone = z.infer<typeof Tone>;
 export type Verbosity = z.infer<typeof Verbosity>;
+export type Persona = z.infer<typeof Persona>;
 
 export const DEFAULT_PREFERENCES: BotPreferences = BotPreferencesSchema.parse({});
 

@@ -5,7 +5,7 @@ import type { Database } from '@my-soso/db';
 import { buildAgentTools } from './tools.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { createOpenRouterModel } from './openrouter.js';
-import type { Tone, Verbosity } from '../preferences.js';
+import type { Persona, Tone, Verbosity } from '../preferences.js';
 
 export interface AgentDeps {
   market: MarketDataProvider;
@@ -37,6 +37,7 @@ export interface RunAgentInput {
   tone?: Tone;
   verbosity?: Verbosity;
   language?: string;
+  persona?: Persona;
 }
 
 export interface RunAgentResult {
@@ -59,7 +60,7 @@ export function createAgent(deps: AgentDeps): Agent {
   const maxOutputTokens = deps.maxOutputTokens ?? 600;
 
   return {
-    run: async ({ userMessage, conversationId, userId, tone, verbosity, language }) => {
+    run: async ({ userMessage, conversationId, userId, tone, verbosity, language, persona }) => {
       // Tools are rebuilt per call so the closures over `userId` are
       // bounded to a single message — no chance of cross-tenant leak
       // through a stale tool reference.
@@ -77,6 +78,7 @@ export function createAgent(deps: AgentDeps): Agent {
           tone: tone ?? 'concise',
           verbosity: verbosity ?? 'normal',
           language: language ?? 'en',
+          persona: persona ?? 'panda',
         }),
         prompt: userMessage,
         tools,

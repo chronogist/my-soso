@@ -88,6 +88,7 @@ const ChannelOverrideSchema = z
   .strict();
 const PreferencesSchema = z
   .object({
+    persona: z.enum(['panda', 'classic', 'shark', 'zen']).default('panda'),
     tone: z.enum(['concise', 'detailed', 'casual', 'formal']).default('concise'),
     verbosity: z.enum(['short', 'normal', 'long']).default('normal'),
     language: z.string().trim().min(2).max(8).default('en'),
