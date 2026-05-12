@@ -418,6 +418,7 @@ h2 {
   font-weight: 700;
   letter-spacing: -0.01em;
   z-index: 4;
+  animation: entryReveal 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entry__brand-dot {
@@ -444,6 +445,86 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.16em;
   z-index: 4;
+  animation: entryReveal 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry__story {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.entry__story-wordmark {
+  position: absolute;
+  color: rgba(255, 255, 255, 0.05);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  animation:
+    entryStoryReveal 1100ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    entryStoryDrift 14s ease-in-out 1100ms infinite;
+}
+
+.entry__story-wordmark--left {
+  top: 18%;
+  left: 3%;
+}
+
+.entry__story-wordmark--right {
+  right: 5%;
+  bottom: 16%;
+  animation-delay: 180ms, 1500ms;
+}
+
+.entry__story-rail {
+  position: absolute;
+  left: 5%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 560px;
+  opacity: 0.8;
+  animation: entryStoryReveal 1300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry__story-node {
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  background: rgba(16, 16, 16, 0.28);
+  color: rgba(245, 245, 244, 0.22);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.entry__story-node--accent {
+  border-color: rgba(245, 180, 39, 0.14);
+  color: rgba(245, 180, 39, 0.42);
+  background: rgba(245, 180, 39, 0.05);
+}
+
+.entry__story-line {
+  width: 72px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(245, 180, 39, 0.16));
+  position: relative;
+  overflow: hidden;
+}
+
+.entry__story-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: translateX(-120%);
+  animation: entrySignalFlow 3.4s linear infinite;
 }
 
 .entry__orb {
@@ -459,18 +540,61 @@ h2 {
     radial-gradient(ellipse at 50% 55%, rgba(180, 70, 10, 0.5), transparent 70%);
   filter: blur(28px);
   pointer-events: none;
-  animation: entryOrb 8s ease-in-out infinite;
+  animation:
+    entryOrbReveal 1200ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    entryOrb 8s ease-in-out 1200ms infinite;
   z-index: 1;
+}
+
+@keyframes entryOrbReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes entryStoryReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes entryStoryDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(10px, -6px, 0);
+  }
+}
+
+@keyframes entrySignalFlow {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(140%);
+  }
 }
 
 @keyframes entryOrb {
   0%,
   100% {
-    transform: scale(1);
+    transform: scale(1) translate3d(0, 0, 0);
     opacity: 0.95;
   }
   50% {
-    transform: scale(1.06);
+    transform: scale(1.06) translate3d(16px, -8px, 0);
     opacity: 1;
   }
 }
@@ -478,16 +602,18 @@ h2 {
 .entry__bubble {
   position: absolute;
   padding: 9px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 999px;
-  background: rgba(22, 22, 22, 0.7);
+  background: rgba(22, 22, 22, 0.34);
   backdrop-filter: blur(8px);
-  color: rgba(235, 235, 232, 0.78);
+  color: rgba(235, 235, 232, 0.36);
   font-size: 0.86rem;
   letter-spacing: -0.005em;
   z-index: 2;
   pointer-events: none;
-  animation: entryFloat 6s ease-in-out infinite;
+  animation:
+    entryBubbleReveal 900ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    entryFloat 6s ease-in-out 900ms infinite;
 }
 
 .entry__bubble--alert {
@@ -505,19 +631,30 @@ h2 {
 .entry__bubble--transfer {
   bottom: 22%;
   left: 22%;
-  background: rgba(40, 28, 12, 0.65);
-  color: rgba(255, 220, 160, 0.85);
-  border-color: rgba(245, 180, 39, 0.18);
+  background: rgba(40, 28, 12, 0.28);
+  color: rgba(255, 220, 160, 0.34);
+  border-color: rgba(245, 180, 39, 0.1);
   animation-delay: 3s;
 }
 
 @keyframes entryFloat {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) rotate(0deg);
   }
   50% {
-    transform: translateY(-6px);
+    transform: translate3d(0, -8px, 0) rotate(-1deg);
+  }
+}
+
+@keyframes entryBubbleReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -533,6 +670,47 @@ h2 {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(18px);
   z-index: 3;
+  overflow: hidden;
+  animation: entryCardReveal 820ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry__card::before {
+  content: '';
+  position: absolute;
+  inset: -40% auto auto -30%;
+  width: 56%;
+  height: 180%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 46%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 255, 255, 0.05) 54%,
+    transparent 100%
+  );
+  transform: rotate(12deg) translateX(-140%);
+  pointer-events: none;
+  animation: entryCardSweep 1400ms ease 500ms both;
+}
+
+@keyframes entryCardReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes entryCardSweep {
+  0% {
+    transform: rotate(12deg) translateX(-140%);
+  }
+  100% {
+    transform: rotate(12deg) translateX(280%);
+  }
 }
 
 .entry__card--loading {
@@ -589,6 +767,7 @@ h2 {
   font-size: 0.74rem;
   font-weight: 600;
   letter-spacing: 0.2em;
+  animation: entryReveal 960ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entry__pulse {
@@ -620,6 +799,7 @@ h2 {
   letter-spacing: -0.02em;
   color: #f5f5f4;
   max-width: none;
+  animation: entryReveal 1040ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entry__lede {
@@ -629,6 +809,7 @@ h2 {
   color: rgba(235, 235, 232, 0.6);
   font-size: 0.94rem;
   line-height: 1.55;
+  animation: entryReveal 1120ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entry__meta {
@@ -639,6 +820,7 @@ h2 {
   color: rgba(235, 235, 232, 0.4);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
+  animation: entryReveal 1200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entry__error {
@@ -676,7 +858,21 @@ h2 {
   transition:
     border-color 200ms ease,
     background 200ms ease,
-    transform 200ms ease;
+    transform 200ms ease,
+    box-shadow 200ms ease;
+  animation: entryProtocolReveal 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.entry__protocols li:nth-child(1) .entry__protocol {
+  animation-delay: 180ms;
+}
+
+.entry__protocols li:nth-child(2) .entry__protocol {
+  animation-delay: 270ms;
+}
+
+.entry__protocols li:nth-child(3) .entry__protocol {
+  animation-delay: 360ms;
 }
 
 .entry__protocol:hover:not(:disabled),
@@ -752,6 +948,11 @@ h2 {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(235, 235, 232, 0.6);
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 .entry__protocol-state {
@@ -777,6 +978,50 @@ h2 {
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 10px rgba(134, 239, 172, 0.4);
+}
+
+@keyframes entryReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes entryProtocolReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry__story-wordmark,
+  .entry__story-rail,
+  .entry__story-line::after,
+  .entry__brand,
+  .entry__badge,
+  .entry__orb,
+  .entry__bubble,
+  .entry__card,
+  .entry__card::before,
+  .entry__eyebrow,
+  .entry__title,
+  .entry__lede,
+  .entry__meta,
+  .entry__protocol,
+  .entry__pulse,
+  .entry__loading-dots span {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 
 /* ── Hub / post-pick setup ────────────────────────────────────────────── */
@@ -1963,6 +2208,40 @@ h2 {
     padding: 7px 10px;
     font-size: 0.62rem;
     letter-spacing: 0.1em;
+  }
+
+  .entry__story-wordmark {
+    font-size: 1.6rem;
+  }
+
+  .entry__story-wordmark--left {
+    top: 15%;
+    left: 5%;
+  }
+
+  .entry__story-wordmark--right {
+    right: 6%;
+    bottom: 20%;
+  }
+
+  .entry__story-rail {
+    left: 6%;
+    right: 6%;
+    top: auto;
+    bottom: 11%;
+    gap: 8px;
+    max-width: none;
+    overflow: hidden;
+  }
+
+  .entry__story-node {
+    padding: 6px 9px;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+
+  .entry__story-line {
+    width: 38px;
   }
 
   .entry__brand {

@@ -107,6 +107,22 @@ export function EntryPicker() {
         SOSOVALUE
       </div>
 
+      <div className="entry__story" aria-hidden>
+        <div className="entry__story-wordmark entry__story-wordmark--left">🐼 MySoSo Panda</div>
+        <div className="entry__story-wordmark entry__story-wordmark--right">
+          Signal to Execution
+        </div>
+        <div className="entry__story-rail">
+          <span className="entry__story-node">Signal</span>
+          <span className="entry__story-line" />
+          <span className="entry__story-node">Context</span>
+          <span className="entry__story-line" />
+          <span className="entry__story-node">Conviction</span>
+          <span className="entry__story-line" />
+          <span className="entry__story-node entry__story-node--accent">Execution</span>
+        </div>
+      </div>
+
       <div className="entry__orb" aria-hidden />
       <div className="entry__bubble entry__bubble--alert" aria-hidden>
         Alert: ETH crossed 3k
@@ -190,9 +206,7 @@ export function EntryPicker() {
                 <strong>WhatsApp</strong>
                 <small>{isLinked('whatsapp') ? 'Already linked' : 'Ready to connect'}</small>
               </span>
-              {isLinked('whatsapp') ? (
-                <span className="entry__protocol-state">Linked</span>
-              ) : null}
+              {isLinked('whatsapp') ? <span className="entry__protocol-state">Linked</span> : null}
               <span className="entry__protocol-arrow">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
