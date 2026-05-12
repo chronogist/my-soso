@@ -1,6 +1,6 @@
 # My-Soso
 
-A personal finance agent that lives in your chat app.
+A signal-to-execution personal finance agent that lives in your chat app.
 
 Sign up once, pick Telegram, Discord, or WhatsApp, and you get your own AI agent that watches the markets, tracks what you care about, and tells you what matters — without you ever opening another tab.
 
@@ -12,19 +12,19 @@ Active crypto users today are forced to context-switch between price charts, new
 
 My-Soso compresses that whole workflow into the chat app you already check 50 times a day. Instead of 200 headlines, you see the 2 that affect your portfolio. Instead of "is BTC up or down?" panic-checking, you get a personal analyst that pings you only when something genuinely changes.
 
-It's a bot, but it doesn't behave like one. It understands plain English ("why is ETH down today?", "alert me on big Solana news"), it remembers your watchlist, and it filters the firehose using AI — not keywords.
+It's a bot, but it doesn't behave like one. It understands plain English ("why is ETH down today?", "alert me on big Solana news"), it remembers your watchlist, and it turns noisy market data into discussion-ready signals today, with execution workflows planned as the product matures.
 
 ---
 
 ## What it does
 
-- **Ask anything.** *"How are BTC ETF flows this week?"* → pulls flow data, summarizes the trend.
+- **Signal-rich discussion.** *"How are BTC ETF flows this week?"* → pulls flow data, summarizes the trend, and frames what matters.
 - **Track your watchlist.** Daily and weekly digests pushed automatically.
 - **Smart alerts.** Price thresholds, ETF flow shifts, AI-filtered news that's actually about *your* assets.
 - **Research on demand.** *"Give me a one-pager on Hyperliquid"* → returns a structured memo.
-- **Index discovery.** Browse SoSoValue's on-chain indices; track them; (Wave 3) follow them.
+- **Signal to execution roadmap.** Today: discussion, watchlists, alerts, digests, and research powered by SoSoValue. Later phases: follow-through into guided, confirmed trade execution.
 
-It does **not** give buy/sell recommendations or move money in Wave 1. Execution and risk controls land in Wave 3, behind a confirm-to-execute UX and a compliance review.
+Today, MySoSo is focused on discussion, signals, watchlists, alerts, and market context powered by SoSoValue. Trade execution is part of the product direction, but it lands in later phases behind confirm-to-execute UX, risk controls, and compliance review.
 
 ---
 
@@ -70,10 +70,29 @@ Lean by design. Eight integrations, no ceremony.
 | **Telegram, Discord, WhatsApp** | Three channels, one shared agent |
 | **Postgres on Supabase** | User data; Row-Level Security for tenant isolation |
 | **Upstash Redis + BullMQ** | Job queue + warmed cache + rate-limit counters |
-| **Railway** | Hosts all four services + dashboard |
+| **Vercel + Render + Fly.io** | Dashboard on Vercel, API/Edge on Render, Worker on Fly.io |
 | **Sentry** | Errors and basic performance |
 
 End-to-end **TypeScript**. Monorepo via pnpm workspaces + Turborepo. Drizzle ORM. grammY for Telegram. discord-interactions for Discord. WhatsApp Business Cloud API directly.
+
+## Live Endpoints
+
+### User entrypoints
+
+- **MySoSo Panda Dashboard:** [https://my-soso-dashboard.vercel.app](https://my-soso-dashboard.vercel.app)
+- **MySoSo Panda Telegram:** [https://t.me/mysoso_agent_bot](https://t.me/mysoso_agent_bot)
+- **MySoSo Panda Discord:** [https://discord.com/oauth2/authorize?client_id=1502783425969651823](https://discord.com/oauth2/authorize?client_id=1502783425969651823)
+- **MySoSo Panda WhatsApp:** Coming soon
+
+### Backend services
+
+- **API:** [https://my-soso-api.onrender.com](https://my-soso-api.onrender.com)
+- **Edge:** [https://my-soso-edge.onrender.com](https://my-soso-edge.onrender.com)
+- **Worker:** [https://my-soso-worker.fly.dev](https://my-soso-worker.fly.dev)
+
+### Infrastructure
+
+- **Redis:** Upstash Redis
 
 ## Getting Started
 
@@ -135,8 +154,8 @@ Code (apps + packages) gets added when we begin the build.
 
 Three waves, each independently demoable. If a later wave slips, earlier waves still ship.
 
-### Wave 1 — Multi-channel advisory agent
-Telegram + Discord + WhatsApp on day one. Q&A, watchlists, AI-filtered news alerts, daily digests, research memos. Powered entirely by SoSoValue. No execution.
+### Wave 1 — Multi-channel signal and discussion agent
+Telegram + Discord + WhatsApp on day one. Watchlists, AI-filtered news alerts, daily digests, research memos, and discussion-ready market signals powered entirely by SoSoValue. No execution yet.
 
 ### Wave 2 — AI signal layer + SoDEX read + SSI discovery
 Opportunity discovery, news-to-signal extraction, weekly portfolio digests, sentiment alerts. SoDEX read APIs for orderbook/positions. SSI Protocol for on-chain index discovery. Richer chat UX (inline buttons, embeds, conversation memory).
@@ -155,13 +174,13 @@ Full feature checklists live in [`plan.md`](plan.md).
 - **Cache-first.** SoSoValue is the heart of the product, but the hot path never hits it directly. Prefetcher + Redis + monthly budget tracker keep us under quota and fast.
 - **Custody-light.** We don't hold private keys. Ever. Privy's enclave does the signing in Wave 3.
 - **Tenant isolation at the database.** Postgres RLS, not just app-layer checks.
-- **Compliance-aware.** Every response is classified; recommendations are hard-blocked in Wave 1; execution gated behind counsel review.
+- **Compliance-aware.** Every response is classified; execution is gated behind explicit confirmation, risk controls, and counsel review.
 - **Observable from day one.** Structured logs, Sentry, one dashboard the team checks every morning.
 
 ---
 
 ## Status
 
-**Wave 1 / Phases 1–4 complete; Phase 5 in progress.** Telegram/Discord/WhatsApp are wired through Edge → Redis → Worker with SoSoValue-backed answers, watchlists, alerts, and digests. Discord supports both slash commands and “normal DM chat” via a Gateway listener (Message Content Intent required).
+**Wave 1 / Phases 1–4 complete; Phase 5 in progress.** Telegram is live through the dashboard + Edge → Redis → Worker path, Discord wiring is in place with install/link flow still being finalized, and WhatsApp is listed as coming soon. The deployed surfaces are: dashboard on Vercel, API + Edge on Render, worker on Fly.io, and Redis on Upstash.
 
 Read [`architecture.md`](architecture.md) before writing code. Update it before changing something it describes.
