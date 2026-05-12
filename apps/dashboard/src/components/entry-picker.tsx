@@ -17,6 +17,7 @@ export function EntryPicker() {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
   const [resolving, setResolving] = useState(false);
   const [links, setLinks] = useState<ChannelLink[]>([]);
+  const [chosenChannel, setChosenChannel] = useState<Channel | null>(() => readChosenChannel());
 
   useEffect(() => {
     if (!ready || !authenticated) return;
@@ -25,7 +26,10 @@ export function EntryPicker() {
     void (async () => {
       try {
         const token = await getAccessToken();
-        if (!token) return;
+        if (!token) {
+          if (!cancelled && chosenChannel) router.replace('/setup');
+          return;
+        }
         const { links } = await apiFetch<{ links: ChannelLink[] }>('/v1/channel-links', token);
         if (cancelled) return;
         setLinks(links);
@@ -36,16 +40,20 @@ export function EntryPicker() {
           // linked channel so /hub has a chosenChannel to render against,
           // then hand them to /hub directly. They can still revisit /setup
           // from the hub if they need to adjust or add another channel.
-          if (!readChosenChannel()) {
+          if (!chosenChannel) {
             persistChosenChannel(links[0]!.channel);
+            setChosenChannel(links[0]!.channel);
           }
           router.replace('/hub');
           return;
         }
-        if (readChosenChannel()) router.replace('/setup');
+        if (chosenChannel) router.replace('/setup');
       } catch {
         // API unreachable — fall through and let the picker render so the
-        // user can still choose a platform manually.
+        // user can still choose a platform manually. If they already picked
+        // a channel before authenticating, continue onboarding instead of
+        // forcing an unnecessary second click.
+        if (!cancelled && chosenChannel) router.replace('/setup');
       } finally {
         if (!cancelled) setResolving(false);
       }
@@ -53,11 +61,12 @@ export function EntryPicker() {
     return () => {
       cancelled = true;
     };
-  }, [ready, authenticated, getAccessToken, router]);
+  }, [ready, authenticated, chosenChannel, getAccessToken, router]);
 
   function selectChannel(channel: Channel) {
     persistSwitchingPlatform(false);
     persistChosenChannel(channel);
+    setChosenChannel(channel);
     if (authenticated) {
       router.push('/setup');
     } else {
