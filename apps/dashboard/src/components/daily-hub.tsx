@@ -331,6 +331,20 @@ export function DailyHub() {
           Tune how your {CHANNEL_META[chosenChannel].name} agent talks, alerts, and digests.
         </p>
 
+        <section className="hub__persona hub__persona--compact">
+          <div>
+            <div className="hub__persona-mark">
+              <span className="hub__persona-dot" />
+              🐼 MySoSo Panda
+            </div>
+            <p className="hub__persona-copy">
+              Your personal intelligent finance buddy on {CHANNEL_META[chosenChannel].name}. This
+              is where you shape how your Panda speaks, what it watches, when it checks in, and
+              how it grows from signal intelligence into execution-ready support.
+            </p>
+          </div>
+        </section>
+
         {error ? <div className="hub__error">{error}</div> : null}
 
         <nav className="hub__tabs" role="tablist" aria-label="Hub sections">
@@ -352,11 +366,11 @@ export function DailyHub() {
           <div className="hub__panels">
             <div className="hub__success-panel">
               <div>
-                <h2 className="hub__section">Active Channel</h2>
+                <h2 className="hub__section">Your Panda Is Live On</h2>
                 <p>
                   {isLinked
                     ? `${CHANNEL_META[chosenChannel].name} is live for ${linkedChannel?.channelUserId}.`
-                    : `This channel still needs linking before the agent can reply live.`}
+                    : `This channel still needs linking before your Panda can reply live.`}
                 </p>
               </div>
               <div className="hub__success-actions">
@@ -368,7 +382,7 @@ export function DailyHub() {
             </div>
 
             <article className="hub__panel">
-              <h2 className="hub__section">Digest cadence</h2>
+              <h2 className="hub__section">When Your Panda Checks In</h2>
               <div className="hub__segmented" role="group" aria-label="Digest cadence">
                 {DIGEST_OPTIONS.map((option) => (
                   <button
@@ -385,7 +399,7 @@ export function DailyHub() {
 
               <div className="hub__row">
                 <label className="hub__field">
-                  <span>Delivery time</span>
+                  <span>Check-in time</span>
                   <input
                     type="time"
                     value={preferences.digestTime}
@@ -448,7 +462,7 @@ export function DailyHub() {
           <div className="hub__panels">
             <article className="hub__panel">
               <header className="hub__controls-head">
-                <h2 className="hub__section">Alerts</h2>
+              <h2 className="hub__section">What Your Panda Should Watch</h2>
                 <span>{alerts.filter((a) => a.active).length} active</span>
               </header>
 
@@ -732,7 +746,7 @@ export function DailyHub() {
         {tab === 'personality' ? (
           <div className="hub__panels">
             <article className="hub__panel">
-              <h2 className="hub__section">Tone</h2>
+              <h2 className="hub__section">How Your Panda Speaks</h2>
               <div className="hub__segmented">
                 {TONE_OPTIONS.map((o) => (
                   <button
@@ -836,7 +850,7 @@ export function DailyHub() {
         {tab === 'channels' ? (
           <div className="hub__panels">
             <article className="hub__panel">
-              <h2 className="hub__section">Per-channel preferences</h2>
+              <h2 className="hub__section">Where Your Panda Can Reach You</h2>
               <p className="hub__hint">
                 Override tone or mute alerts for specific channels (e.g. terse on WhatsApp due to
                 template costs).

@@ -155,6 +155,22 @@ export function SetupHub() {
           watchlist, alerts, and digests.
         </p>
 
+        <section className="hub__persona">
+          <div className="hub__persona-mark">
+            <span className="hub__persona-dot" />
+            🐼 MySoSo Panda
+          </div>
+          <h2 className="hub__persona-title">
+            Your personal intelligent finance buddy on {channelMeta.name}
+          </h2>
+          <p className="hub__persona-copy">
+            This is the Panda that watches your signals, remembers your watchlist, and talks you
+            through the market in the channel you already use every day. It is also your
+            signal-to-execution companion, designed to grow from market context and conviction into
+            guided trade execution.
+          </p>
+        </section>
+
         {error ? <div className="hub__error">{error}</div> : null}
 
         {!isLinked ? (
@@ -201,7 +217,7 @@ export function SetupHub() {
             </li>
             <li>
               <span className="hub__step">3</span>
-              <span>Wait here a moment while the dashboard confirms the live link.</span>
+              <span>Wait here a moment while the dashboard confirms your Panda is live.</span>
             </li>
           </ol>
         </div>
@@ -220,8 +236,8 @@ export function SetupHub() {
             <div>
               <h2 className="hub__section">Ready For Daily Use</h2>
               <p>
-                Go to the hub to manage alerts, your watchlist, and digest cadence without
-                revisiting onboarding.
+                Go to the hub to shape how your Panda watches the market, checks in, and keeps up
+                with your watchlist without revisiting onboarding.
               </p>
             </div>
             <Link className="hub__primary-link" href="/hub">
