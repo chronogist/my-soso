@@ -43,7 +43,11 @@ function parseLinkPayload(raw: string | null) {
 }
 
 export function registerTelegramWebhook(app: FastifyInstance, config: Config): void {
-  const connection = createConnection({ url: config.REDIS_URL });
+  const connection = createConnection({
+    url: config.REDIS_URL,
+    name: 'edge-telegram',
+    onError: (err) => app.log.error({ err }, 'redis connection error'),
+  });
   const db = createDb({ url: config.DATABASE_URL, max: 3 });
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
 

@@ -21,7 +21,11 @@ function main() {
   const log = buildLogger(config);
   log.info('worker starting');
 
-  const connection = createConnection({ url: config.REDIS_URL });
+  const connection = createConnection({
+    url: config.REDIS_URL,
+    name: 'worker',
+    onError: (err) => log.error({ err }, 'redis connection error'),
+  });
 
   const stack = buildAgentStack({ config, redis: connection, log });
 

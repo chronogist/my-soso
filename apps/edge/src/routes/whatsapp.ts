@@ -48,7 +48,11 @@ function parseLinkCommand(text: string): string | null {
 export function registerWhatsAppWebhook(app: FastifyInstance, config: Config): void {
   if (!config.WHATSAPP_VERIFY_TOKEN || !config.WHATSAPP_APP_SECRET) return;
 
-  const connection = createConnection({ url: config.REDIS_URL });
+  const connection = createConnection({
+    url: config.REDIS_URL,
+    name: 'edge-whatsapp',
+    onError: (err) => app.log.error({ err }, 'redis connection error'),
+  });
   const db = createDb({ url: config.DATABASE_URL, max: 3 });
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
 

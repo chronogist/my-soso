@@ -43,7 +43,11 @@ function parseLinkPayload(raw: string | null) {
 export function registerDiscordWebhook(app: FastifyInstance, config: Config): void {
   if (!config.DISCORD_PUBLIC_KEY) return;
 
-  const connection = createConnection({ url: config.REDIS_URL });
+  const connection = createConnection({
+    url: config.REDIS_URL,
+    name: 'edge-discord',
+    onError: (err) => app.log.error({ err }, 'redis connection error'),
+  });
   const db = createDb({ url: config.DATABASE_URL, max: 3 });
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
 

@@ -64,7 +64,11 @@ export function startDiscordGatewayListener(config: Config, log: FastifyBaseLogg
     Boolean(botToken);
   if (!enable) return null;
 
-  const connection = createConnection({ url: config.REDIS_URL });
+  const connection = createConnection({
+    url: config.REDIS_URL,
+    name: 'edge-discord-gateway',
+    onError: (err) => log.error({ err }, 'redis connection error'),
+  });
   const db = createDb({ url: config.DATABASE_URL, max: 3 });
   const outboundQueue = createQueue<OutboundJob>(QueueNames.outbound, connection);
 

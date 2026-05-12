@@ -40,7 +40,11 @@ export async function buildServer(config: Config): Promise<FastifyInstance> {
     db: await healthCheck(db),
   }));
 
-  const redis = createConnection({ url: config.REDIS_URL });
+  const redis = createConnection({
+    url: config.REDIS_URL,
+    name: 'api',
+    onError: (err) => app.log.error({ err }, 'redis connection error'),
+  });
   const verifier = await createPrivyVerifier({
     appId: config.PRIVY_APP_ID,
     verificationKey: config.PRIVY_JWT_VERIFICATION_KEY,
