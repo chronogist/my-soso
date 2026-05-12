@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ChangeEvent } from 'react';
 import type { BotPreferences, Tone, Verbosity, NewsStrength, WatchlistItem } from '../lib/api';
-import { AccountSummaryCard, CHANNEL_META, NotificationTray, handoffAction } from './hub-shared';
+import {
+  AccountSummaryCard,
+  CHANNEL_META,
+  ChannelIcon,
+  ChannelLabel,
+  NotificationTray,
+  handoffAction,
+} from './hub-shared';
 import { DIGEST_OPTIONS, PRICE_OP_OPTIONS, formatAlertDetail, useHubState } from './use-hub-state';
 
 type Tab = 'overview' | 'alerts' | 'personality' | 'coverage' | 'channels';
@@ -218,7 +225,7 @@ export function DailyHub() {
   const patch = (next: Partial<BotPreferences>) => savePreferences({ ...preferences, ...next });
 
   return (
-    <main className="hub">
+    <main className={`hub hub--${chosenChannel}`}>
       <NotificationTray notifications={notifications} onDismiss={dismissNotification} />
       <div className="hub__brand">
         <span className="entry__brand-dot" />
@@ -290,7 +297,9 @@ export function DailyHub() {
             <ul className="hub__linked-list">
               {links.map((link) => (
                 <li key={link.id}>
-                  <strong>{link.channel}</strong>
+                  <strong>
+                    <ChannelLabel channel={link.channel} />
+                  </strong>
                   <span className="hub__mono">{link.channelUserId}</span>
                 </li>
               ))}
@@ -306,10 +315,18 @@ export function DailyHub() {
           <span className={`hub__pill ${isLinked ? 'hub__pill--ok' : 'hub__pill--warn'}`}>
             {isLinked ? 'LIVE LINKED' : 'SETUP NEEDED'}
           </span>
-          <span className="hub__node">ENCRYPTED NODE 04</span>
+          <span className="hub__node hub__node--platform">
+            <ChannelIcon channel={chosenChannel} />
+            {CHANNEL_META[chosenChannel].name} live
+          </span>
         </div>
 
-        <h1 className="hub__title">Daily Hub</h1>
+        <h1 className="hub__title">
+          <span className="hub__title-platform">
+            <ChannelIcon channel={chosenChannel} className="hub__title-icon" />
+            <span>Daily Hub</span>
+          </span>
+        </h1>
         <p className="hub__lede">
           Tune how your {CHANNEL_META[chosenChannel].name} agent talks, alerts, and digests.
         </p>
@@ -828,7 +845,9 @@ export function DailyHub() {
                 const ov = preferences.channelOverrides[ch] ?? {};
                 return (
                   <div key={ch} className="hub__override">
-                    <strong>{CHANNEL_META[ch].name}</strong>
+                    <strong>
+                      <ChannelLabel channel={ch} />
+                    </strong>
                     <label className="hub__field">
                       <span>Tone</span>
                       <select

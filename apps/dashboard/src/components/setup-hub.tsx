@@ -4,6 +4,8 @@ import Link from 'next/link';
 import {
   AccountSummaryCard,
   CHANNEL_META,
+  ChannelIcon,
+  ChannelLabel,
   LinkCodeCard,
   NotificationTray,
   channelInstructions,
@@ -58,7 +60,7 @@ export function SetupHub() {
   const isLinked = Boolean(linkedChannel);
 
   return (
-    <main className="hub">
+    <main className={`hub hub--${chosenChannel}`}>
       <NotificationTray notifications={notifications} onDismiss={dismissNotification} />
       <div className="hub__brand">
         <span className="entry__brand-dot" />
@@ -105,8 +107,7 @@ export function SetupHub() {
               {links.map((link) => (
                 <li key={link.id}>
                   <strong>
-                    {CHANNEL_META[link.channel].name}
-                    {link.channel === chosenChannel ? ' (current)' : ''}
+                    <ChannelLabel channel={link.channel} current={link.channel === chosenChannel} />
                   </strong>
                   <span className="hub__mono">{link.channelUserId}</span>
                 </li>
@@ -137,21 +138,18 @@ export function SetupHub() {
           <span className={`hub__pill ${isLinked ? 'hub__pill--ok' : 'hub__pill--warn'}`}>
             {isLinked ? 'LINKED' : 'NOT LINKED'}
           </span>
-          <span className="hub__node">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M12 2L3 7l9 5 9-5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            </svg>
-            ENCRYPTED NODE 04
+          <span className="hub__node hub__node--platform">
+            <ChannelIcon channel={chosenChannel} />
+            {CHANNEL_META[chosenChannel].name} channel
           </span>
         </div>
 
-        <h1 className="hub__title">{channelMeta.name} Setup</h1>
+        <h1 className="hub__title">
+          <span className="hub__title-platform">
+            <ChannelIcon channel={chosenChannel} className="hub__title-icon" />
+            <span>{channelMeta.name} Setup</span>
+          </span>
+        </h1>
         <p className="hub__lede">
           Link your {channelMeta.name} account here, then move into the hub for your day-to-day
           watchlist, alerts, and digests.
