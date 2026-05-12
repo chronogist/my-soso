@@ -110,10 +110,19 @@ cp .env.example .env
 ### 3. Local Redis & Tunnel
 The project uses Redis for queues. For Telegram/WhatsApp webhooks you also need a public tunnel (ngrok) so the platforms can reach your local Edge service.
 
+Before starting Redis, make sure your local container runtime is running. `pnpm redis:up` uses your local container runtime and supports both Docker Desktop and Podman setups.
+
+- **Docker Desktop:** Open Docker Desktop and wait for it to finish starting.
+- **Podman:** Start your VM first with `podman machine start` (run `podman machine init` once if needed). If Podman is installed, the repo will prefer `podman compose`.
+
 **Start Redis:**
 ```bash
 pnpm redis:up
 ```
+
+If you see an error like `unable to connect to Podman socket` or `connection refused`, your container runtime is not running yet.
+
+Once Redis is already running, you do **not** need to run `pnpm redis:up` again unless you have stopped the container, restarted your machine, or brought the stack down manually.
 
 **Start Tunnel (Required for Telegram/WhatsApp):**
 In a separate terminal:
