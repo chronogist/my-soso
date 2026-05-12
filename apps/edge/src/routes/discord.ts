@@ -193,7 +193,7 @@ export function registerDiscordWebhook(app: FastifyInstance, config: Config): vo
 
         req.log.info({ userId: linkPayload.data.userId }, 'discord account linked');
         await sendFollowup(
-          '🐼 Discord is linked. Your My-Soso Panda now knows this account belongs to you.',
+          '🐼 Nice — your Discord is now connected to My-Soso Panda! 🐼 \n\nFrom here on, your panda buddy can help you keep up with your portfolio, market moves, watchlists, and crypto trends right inside Discord — powered by SosoValue data. 📊',
           `link-ok-${idempotencyKey}`,
           linkPayload.data.userId,
         );

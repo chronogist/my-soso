@@ -186,7 +186,7 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
         userId: linkPayload.data.userId,
         externalUserId,
         conversationId,
-          text: '🐼 Telegram is linked. Your My-Soso Panda now knows this chat belongs to you.',
+        text: '🐼 Nice — your Telegram is now connected to My-Soso Panda! 🐼 \n\nFrom here on, your panda buddy can help you keep up with your portfolio, market moves, watchlists, and crypto trends right inside Discord — powered by SosoValue data. 📊',
         idempotencyKey: `link-ok-${idempotencyKey}`,
       });
       req.log.info({ userId: linkPayload.data.userId }, 'telegram account linked');
