@@ -12,6 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <PrivyRoot>{children}</PrivyRoot>
+        <div className="dashboard-powered-by">Powered by SoSoValueAPI</div>
       </body>
     </html>
   );
