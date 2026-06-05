@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -70,6 +71,9 @@ export const watchlistItems = pgTable(
       .references(() => watchlists.id, { onDelete: 'cascade' }),
     assetSymbol: text('asset_symbol').notNull(),
     assetKind: text('asset_kind').notNull().default('crypto'),
+    quantity: numeric('quantity', { precision: 30, scale: 10 }),
+    avgEntryPrice: numeric('avg_entry_price', { precision: 30, scale: 10 }),
+    entryDate: date('entry_date'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
