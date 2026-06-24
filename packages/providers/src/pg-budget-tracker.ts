@@ -32,6 +32,13 @@ export function createPgBudgetTracker(opts: PgBudgetTrackerOptions): BudgetTrack
   const hardStop = opts.hardStopThreshold ?? 0.95;
 
   return {
+    /**
+     * Atomically reserve `count` calls against the monthly budget.
+     * The SQL uses INSERT ON CONFLICT DO UPDATE with a WHERE guard
+     * (`calls_used + $count <= calls_limit`) so two replicas cannot
+     * collectively overshoot. Returns true when the budget had room;
+     * false when this call would exceed callsLimit.
+     */
     acquire: async (count) => {
       if (count <= 0) return true;
       const rows = await withServiceContext(opts.db, async (tx) =>

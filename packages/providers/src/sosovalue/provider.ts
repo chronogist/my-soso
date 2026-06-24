@@ -82,6 +82,13 @@ export class SoSoValueProvider implements MarketDataProvider, NewsProvider {
     };
   }
 
+  /**
+   * Returns spot prices for the requested symbols. Because SoSoValue lacks
+   * a batch endpoint, each symbol resolves via an individual `getPrice` call
+   * in parallel. Individual failures are silently dropped — the returned map
+   * contains only successfully resolved symbols. Callers must handle partial
+   * results (e.g. the alert engine treats a missing symbol as "not fired").
+   */
   async getPrices(symbols: readonly string[]): Promise<ReadonlyMap<string, Price>> {
     // SoSoValue has no batch market-snapshot endpoint as of this writing.
     // Settle promises in parallel and skip the symbols that fail.
