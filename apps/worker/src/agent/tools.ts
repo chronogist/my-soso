@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   ProviderError,
   RateLimitedError,
@@ -307,6 +307,87 @@ export function buildAgentTools({ market, news, db, userId, log, conversationId 
           removed: removed.length > 0,
         };
       },
+    }),
+
+    getPortfolioSummary: tool({
+      description:
+        "Get the user's portfolio summary — current value, cost basis, and unrealized P&L for each holding they've tracked. Only includes watchlist items where the user set a quantity and average entry price.",
+      inputSchema: z.object({}),
+      execute: trace('getPortfolioSummary', async () => {
+        const watchlist = await ensureDefaultWatchlist(db, userId);
+        const items = await withTenantUser(db, userId, async (tx) =>
+          tx
+            .select()
+            .from(schema.watchlistItems)
+            .where(
+              and(
+                eq(schema.watchlistItems.watchlistId, watchlist.id),
+                sql`quantity IS NOT NULL AND avg_entry_price IS NOT NULL`,
+              ),
+            )
+            .orderBy(schema.watchlistItems.createdAt),
+        );
+        if (items.length === 0) {
+          return {
+            ok: true as const,
+            hasHoldings: false,
+            message:
+              'No holdings tracked yet. Add a quantity and average entry price to a watchlist item via the dashboard to track P&L.',
+            holdings: [],
+            portfolio: null,
+          };
+        }
+        const symbols = items.map((i) => i.assetSymbol);
+        let prices: Map<string, { price: number; change24hPct: number | null }>;
+        try {
+          const raw = await market.getPrices(symbols);
+          prices = new Map(
+            Array.from(raw.entries()).map(([s, p]) => [
+              s,
+              { price: p.price, change24hPct: p.change24hPct },
+            ]),
+          );
+        } catch {
+          prices = new Map();
+        }
+        const holdings = items.map((item) => {
+          const qty = Number(item.quantity);
+          const entry = Number(item.avgEntryPrice);
+          const current = prices.get(item.assetSymbol);
+          const currentPrice = current?.price ?? null;
+          const costBasis = qty * entry;
+          const currentValue = currentPrice !== null ? qty * currentPrice : null;
+          const unrealizedPnl = currentValue !== null ? currentValue - costBasis : null;
+          const unrealizedPnlPct =
+            unrealizedPnl !== null && costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : null;
+          return {
+            symbol: item.assetSymbol,
+            quantity: qty,
+            avgEntryPrice: entry,
+            currentPrice,
+            change24hPct: current?.change24hPct ?? null,
+            costBasis,
+            currentValue,
+            unrealizedPnl,
+            unrealizedPnlPct,
+          };
+        });
+        const tracked = holdings.filter((h) => h.currentValue !== null);
+        const totalCostBasis = tracked.reduce((s, h) => s + h.costBasis, 0);
+        const totalCurrentValue = tracked.reduce((s, h) => s + h.currentValue!, 0);
+        const totalUnrealizedPnl = totalCurrentValue - totalCostBasis;
+        const totalUnrealizedPnlPct =
+          totalCostBasis > 0 ? (totalUnrealizedPnl / totalCostBasis) * 100 : 0;
+        return {
+          ok: true as const,
+          hasHoldings: true,
+          holdings,
+          portfolio:
+            tracked.length > 0
+              ? { totalCostBasis, totalCurrentValue, totalUnrealizedPnl, totalUnrealizedPnlPct }
+              : null,
+        };
+      }),
     }),
 
     listAlerts: tool({

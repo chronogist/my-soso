@@ -74,22 +74,41 @@ export interface MarketSymbolSuggestion {
   name: string;
 }
 
+export interface WatchlistHolding {
+  costBasis: number;
+  currentValue: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+}
+
 export interface WatchlistItem {
   id: string;
   symbol: string;
   assetKind: string;
+  quantity: number | null;
+  avgEntryPrice: number | null;
+  entryDate: string | null;
   createdAt: string;
   market: {
     priceUsd: number;
     change24hPct: number | null;
     asOf: string;
   } | null;
+  holding: WatchlistHolding | null;
+}
+
+export interface WatchlistPortfolio {
+  totalCostBasis: number;
+  totalCurrentValue: number;
+  totalUnrealizedPnl: number;
+  totalUnrealizedPnlPct: number;
 }
 
 export interface Watchlist {
   id: string;
   name: string;
   isDefault: boolean;
+  portfolio: WatchlistPortfolio | null;
   items: WatchlistItem[];
 }
 
@@ -105,6 +124,12 @@ export interface Alert {
   active: boolean;
   createdAt: string;
   lastFiredAt: string | null;
+}
+
+export interface HoldingPatch {
+  quantity?: number | null;
+  avgEntryPrice?: number | null;
+  entryDate?: string | null;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';

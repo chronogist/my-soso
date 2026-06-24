@@ -213,7 +213,11 @@ export function registerTelegramWebhook(app: FastifyInstance, config: Config): v
 
     // Atomic INCR per conversation. Two Edge replicas posting concurrently
     // for the same chat get distinct, ordered seqNos with no coordination.
-    // The Worker uses this to enforce strict FIFO regardless of retry timing.
+    // The Worker consumes this via its sequence guard (inbound.ts):
+    //   "only process when job.seqNo == lastProcessedSeq + 1"
+    // ensuring strict FIFO even across retries and replica restarts.
+    // Edge's INCR here + Worker's Lua-based advanceProcessedSeq are the
+    // two halves of this FIFO system.
     const seqNo = await nextConversationSeq(connection, conversationId);
 
     const job: InboundJob = {

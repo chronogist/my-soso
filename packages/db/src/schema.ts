@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -70,6 +71,9 @@ export const watchlistItems = pgTable(
       .references(() => watchlists.id, { onDelete: 'cascade' }),
     assetSymbol: text('asset_symbol').notNull(),
     assetKind: text('asset_kind').notNull().default('crypto'),
+    quantity: numeric('quantity', { precision: 30, scale: 10 }),
+    avgEntryPrice: numeric('avg_entry_price', { precision: 30, scale: 10 }),
+    entryDate: date('entry_date'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -78,6 +82,14 @@ export const watchlistItems = pgTable(
   ],
 );
 
+/**
+ * Monthly call budgets per upstream data provider.
+ *
+ * `periodStart` is the start of the calendar month (truncated to midnight
+ * UTC on the 1st). `callsLimit` is the soft monthly cap; the composed
+ * provider layer rejects calls once `callsUsed >= callsLimit`.
+ * Rows are upserted by the budget tracker on each API call.
+ */
 export const providerUsageBudgets = pgTable(
   'provider_usage_budgets',
   {
@@ -158,6 +170,15 @@ export const newsExtractions = pgTable(
   (t) => [index('news_extractions_published_idx').on(t.publishedAt)],
 );
 
+/**
+ * Write-only audit trail of every agent interaction.
+ *
+ * Rows are inserted by the inbound consumer after each `agent.run()` call.
+ * The `classification` column is set by the ComplianceClassifier; values of
+ * `recommendation` or `execution` indicate the reply was sanitised. The
+ * unique index on `(conversationId, inboundIdempotencyKey)` guarantees
+ * exactly-one audit entry per user message.
+ */
 export const agentAuditLog = pgTable(
   'agent_audit_log',
   {

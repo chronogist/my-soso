@@ -11,6 +11,7 @@ import {
   type BotPreferences,
   type ChannelLink,
   type DigestSchedule,
+  type HoldingPatch,
   type LinkCode,
   type MarketSymbolSuggestion,
   type PriceOp,
@@ -380,6 +381,25 @@ export function useHubState(options?: { pollForLink?: boolean }) {
     );
   }
 
+  function updateHolding(itemSymbol: string, patch: HoldingPatch) {
+    run(
+      async () => {
+        const accessToken = await token();
+        await apiFetch(`/v1/watchlist/items/${encodeURIComponent(itemSymbol)}`, accessToken, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        });
+        const next = await apiFetch<{ watchlist: Watchlist }>('/v1/watchlist', accessToken);
+        setWatchlist(next.watchlist);
+      },
+      {
+        loading: 'Saving holding...',
+        success: 'Holding saved.',
+        error: 'Could not save holding.',
+      },
+    );
+  }
+
   function createAlert(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     run(
@@ -535,6 +555,7 @@ export function useHubState(options?: { pollForLink?: boolean }) {
     generateLinkCode,
     addWatchlistItem,
     removeWatchlistItem,
+    updateHolding,
     createAlert,
     toggleAlert,
     deleteAlert,

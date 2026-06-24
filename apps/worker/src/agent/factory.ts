@@ -80,6 +80,15 @@ export function buildAgentStack({
     ...(config.SOSOVALUE_BASE_URL ? { baseUrl: config.SOSOVALUE_BASE_URL } : {}),
   });
 
+  // Request flow through the composed provider:
+  //   cache.get(→ on hit → return)
+  //     → on miss → rateLimit.take(→ denied → RateLimitedError)
+  //       → allowed → budget.recordCall(→ exhausted → silent no-op)
+  //         → inner.getPrice (SoSoValue API)
+  //
+  // Cache errors are fail-open (fall through to the next layer).
+  // Rate-limit denies propagate upward as RateLimitedError to the agent.
+  // Budget exhaustion is a silent no-op (the call is counted but not blocked).
   const provider = composeProvider({
     inner,
     cache,

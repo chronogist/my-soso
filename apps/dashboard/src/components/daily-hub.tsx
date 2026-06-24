@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ChangeEvent } from 'react';
-import type { BotPreferences, Tone, Verbosity, NewsStrength, WatchlistItem } from '../lib/api';
+import type {
+  BotPreferences,
+  HoldingPatch,
+  Tone,
+  Verbosity,
+  NewsStrength,
+  WatchlistItem,
+  WatchlistPortfolio,
+} from '../lib/api';
 import {
   AccountSummaryCard,
   CHANNEL_META,
@@ -97,23 +105,86 @@ function formatUpdatedAt(asOf: string) {
   return `Updated ${days}d ago`;
 }
 
+function formatPnl(value: number) {
+  const abs = Math.abs(value);
+  const formatted = abs >= 1 ? PRICE_FORMATTER.format(value) : PRICE_FORMATTER_SMALL.format(value);
+  return value >= 0 ? `+${formatted}` : formatted;
+}
+
+function PortfolioSummaryCard({ portfolio }: { portfolio: WatchlistPortfolio }) {
+  const pnlPositive = portfolio.totalUnrealizedPnl >= 0;
+  return (
+    <div className="hub__portfolio-summary">
+      <div className="hub__portfolio-row">
+        <span className="hub__portfolio-label">Portfolio value</span>
+        <strong className="hub__portfolio-value">
+          {PRICE_FORMATTER.format(portfolio.totalCurrentValue)}
+        </strong>
+      </div>
+      <div className="hub__portfolio-row">
+        <span className="hub__portfolio-label">Unrealized P&L</span>
+        <span
+          className={`hub__portfolio-pnl ${pnlPositive ? 'hub__portfolio-pnl--up' : 'hub__portfolio-pnl--down'}`}
+        >
+          {formatPnl(portfolio.totalUnrealizedPnl)} (
+          {portfolio.totalUnrealizedPnlPct >= 0 ? '+' : ''}
+          {portfolio.totalUnrealizedPnlPct.toFixed(2)}%)
+        </span>
+      </div>
+      <div className="hub__portfolio-row">
+        <span className="hub__portfolio-label">Cost basis</span>
+        <span className="hub__portfolio-cost">
+          {PRICE_FORMATTER.format(portfolio.totalCostBasis)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function WatchlistRow({
   item,
   isPending,
   isRemoving,
   onRemove,
+  onUpdateHolding,
 }: {
   item: WatchlistItem;
   isPending: boolean;
   isRemoving: boolean;
   onRemove: (symbol: string) => void;
+  onUpdateHolding: (symbol: string, patch: HoldingPatch) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [qtyInput, setQtyInput] = useState(item.quantity !== null ? String(item.quantity) : '');
+  const [entryInput, setEntryInput] = useState(
+    item.avgEntryPrice !== null ? String(item.avgEntryPrice) : '',
+  );
+  const [dateInput, setDateInput] = useState(item.entryDate ?? '');
+
   const change = item.market?.change24hPct ?? null;
   const changeClass =
     change === null ? '' : change >= 0 ? 'hub__asset-change--up' : 'hub__asset-change--down';
+  const pnl = item.holding;
+  const pnlPositive = pnl !== null && pnl.unrealizedPnl >= 0;
+
+  function saveHolding() {
+    const qty = qtyInput.trim() ? Number(qtyInput) : null;
+    const entry = entryInput.trim() ? Number(entryInput) : null;
+    const date = dateInput.trim() || null;
+    onUpdateHolding(item.symbol, { quantity: qty, avgEntryPrice: entry, entryDate: date });
+    setExpanded(false);
+  }
+
+  function clearHolding() {
+    setQtyInput('');
+    setEntryInput('');
+    setDateInput('');
+    onUpdateHolding(item.symbol, { quantity: null, avgEntryPrice: null, entryDate: null });
+    setExpanded(false);
+  }
 
   return (
-    <li>
+    <li className={expanded ? 'hub__watchlist-item--expanded' : ''}>
       <span className="hub__asset-icon">{item.symbol.slice(0, 1)}</span>
       <div className="hub__asset-body">
         <div className="hub__asset-topline">
@@ -129,24 +200,108 @@ function WatchlistRow({
           <strong className="hub__asset-price">
             {item.market ? formatPrice(item.market.priceUsd) : 'Price unavailable'}
           </strong>
-          <span className="hub__asset-updated">
-            {isRemoving
-              ? `Removing ${item.symbol}...`
-              : item.market
-                ? formatUpdatedAt(item.market.asOf)
-                : 'Refresh on next load'}
-          </span>
+          {pnl !== null ? (
+            <span
+              className={`hub__asset-pnl ${pnlPositive ? 'hub__asset-pnl--up' : 'hub__asset-pnl--down'}`}
+            >
+              {formatPnl(pnl.unrealizedPnl)} ({pnl.unrealizedPnlPct >= 0 ? '+' : ''}
+              {pnl.unrealizedPnlPct.toFixed(2)}%)
+            </span>
+          ) : (
+            <span className="hub__asset-updated">
+              {isRemoving
+                ? `Removing ${item.symbol}...`
+                : item.market
+                  ? formatUpdatedAt(item.market.asOf)
+                  : 'Refresh on next load'}
+            </span>
+          )}
         </div>
+        {expanded && (
+          <div className="hub__holding-form">
+            <div className="hub__holding-fields">
+              <label className="hub__holding-field">
+                <span>Quantity</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 0.5"
+                  value={qtyInput}
+                  onChange={(e) => setQtyInput(e.target.value)}
+                />
+              </label>
+              <label className="hub__holding-field">
+                <span>Avg entry (USD)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 58000"
+                  value={entryInput}
+                  onChange={(e) => setEntryInput(e.target.value)}
+                />
+              </label>
+              <label className="hub__holding-field">
+                <span>Entry date</span>
+                <input
+                  type="date"
+                  value={dateInput}
+                  onChange={(e) => setDateInput(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="hub__holding-actions">
+              <button
+                type="button"
+                className="hub__btn hub__btn--primary"
+                onClick={saveHolding}
+                disabled={isPending}
+              >
+                Save
+              </button>
+              {(item.quantity !== null || item.avgEntryPrice !== null) && (
+                <button
+                  type="button"
+                  className="hub__btn hub__btn--ghost"
+                  onClick={clearHolding}
+                  disabled={isPending}
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                className="hub__btn hub__btn--ghost"
+                onClick={() => setExpanded(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      <button
-        className="hub__icon-btn hub__icon-btn--danger"
-        aria-label={isRemoving ? `Removing ${item.symbol}` : `Remove ${item.symbol}`}
-        onClick={() => onRemove(item.symbol)}
-        type="button"
-        disabled={isPending || isRemoving}
-      >
-        {isRemoving ? '…' : '×'}
-      </button>
+      <div className="hub__asset-actions">
+        <button
+          className="hub__icon-btn"
+          aria-label={expanded ? 'Close holding editor' : 'Edit holding'}
+          onClick={() => setExpanded((v) => !v)}
+          type="button"
+          disabled={isPending || isRemoving}
+          title={expanded ? 'Close' : 'Track holding'}
+        >
+          {expanded ? '▲' : '▼'}
+        </button>
+        <button
+          className="hub__icon-btn hub__icon-btn--danger"
+          aria-label={isRemoving ? `Removing ${item.symbol}` : `Remove ${item.symbol}`}
+          onClick={() => onRemove(item.symbol)}
+          type="button"
+          disabled={isPending || isRemoving}
+        >
+          {isRemoving ? '…' : '×'}
+        </button>
+      </div>
     </li>
   );
 }
@@ -189,6 +344,7 @@ export function DailyHub() {
     initialLoaded,
     addWatchlistItem,
     removeWatchlistItem,
+    updateHolding,
     createAlert,
     toggleAlert,
     deleteAlert,
@@ -272,6 +428,7 @@ export function DailyHub() {
               {isAddingWatchlistItem ? 'Adding...' : '+ Add'}
             </button>
           </form>
+          {watchlist?.portfolio && <PortfolioSummaryCard portfolio={watchlist.portfolio} />}
           <ul className="hub__watchlist">
             {watchlist?.items.length ? (
               watchlist.items.map((item) => (
@@ -281,6 +438,7 @@ export function DailyHub() {
                   isPending={isPending}
                   isRemoving={removingWatchlistSymbol === item.symbol}
                   onRemove={removeWatchlistItem}
+                  onUpdateHolding={updateHolding}
                 />
               ))
             ) : (
@@ -338,9 +496,9 @@ export function DailyHub() {
               🐼 MySoSo Panda
             </div>
             <p className="hub__persona-copy">
-              Your personal intelligent finance buddy on {CHANNEL_META[chosenChannel].name}. This
-              is where you shape how your Panda speaks, what it watches, when it checks in, and
-              how it grows from signal intelligence into execution-ready support.
+              Your personal intelligent finance buddy on {CHANNEL_META[chosenChannel].name}. This is
+              where you shape how your Panda speaks, what it watches, when it checks in, and how it
+              grows from signal intelligence into execution-ready support.
             </p>
           </div>
         </section>
@@ -462,7 +620,7 @@ export function DailyHub() {
           <div className="hub__panels">
             <article className="hub__panel">
               <header className="hub__controls-head">
-              <h2 className="hub__section">What Your Panda Should Watch</h2>
+                <h2 className="hub__section">What Your Panda Should Watch</h2>
                 <span>{alerts.filter((a) => a.active).length} active</span>
               </header>
 

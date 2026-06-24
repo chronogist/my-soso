@@ -29,6 +29,14 @@ const SymbolSchema = z
 const WatchlistItemSchema = z.object({
   symbol: SymbolSchema,
   assetKind: z.string().trim().min(1).max(32).default('crypto'),
+  quantity: z.number().positive().optional(),
+  avgEntryPrice: z.number().positive().optional(),
+  entryDate: z.string().date().optional(),
+});
+const UpdateHoldingSchema = z.object({
+  quantity: z.number().positive().nullable().optional(),
+  avgEntryPrice: z.number().positive().nullable().optional(),
+  entryDate: z.string().date().nullable().optional(),
 });
 const AlertIdParamsSchema = z.object({ id: z.string().uuid() });
 const PriceOpSchema = z.enum(['lt', 'lte', 'gt', 'gte']);
@@ -482,26 +490,66 @@ export function registerV1Routes(
         ? await marketData.getPrices(items.map((item) => item.assetSymbol))
         : new Map<string, Price>();
 
+    const enrichedItems = items.map((item) => {
+      const price = prices.get(item.assetSymbol);
+      const market = price
+        ? {
+            priceUsd: price.price,
+            change24hPct: price.change24hPct,
+            asOf: price.asOf.toISOString(),
+          }
+        : null;
+      const qty = item.quantity !== null ? Number(item.quantity) : null;
+      const entry = item.avgEntryPrice !== null ? Number(item.avgEntryPrice) : null;
+      const holding =
+        qty !== null && entry !== null && market !== null
+          ? (() => {
+              const costBasis = qty * entry;
+              const currentValue = qty * market.priceUsd;
+              const unrealizedPnl = currentValue - costBasis;
+              const unrealizedPnlPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
+              return { costBasis, currentValue, unrealizedPnl, unrealizedPnlPct };
+            })()
+          : null;
+      return {
+        id: item.id,
+        symbol: item.assetSymbol,
+        assetKind: item.assetKind,
+        quantity: qty,
+        avgEntryPrice: entry,
+        entryDate: item.entryDate ?? null,
+        createdAt: item.createdAt.toISOString(),
+        market,
+        holding,
+      };
+    });
+
+    const holdingsWithData = enrichedItems.filter((i) => i.holding !== null);
+    const portfolio =
+      holdingsWithData.length > 0
+        ? (() => {
+            const totalCostBasis = holdingsWithData.reduce(
+              (sum, i) => sum + i.holding!.costBasis,
+              0,
+            );
+            const totalCurrentValue = holdingsWithData.reduce(
+              (sum, i) => sum + i.holding!.currentValue,
+              0,
+            );
+            const totalUnrealizedPnl = totalCurrentValue - totalCostBasis;
+            const totalUnrealizedPnlPct =
+              totalCostBasis > 0 ? (totalUnrealizedPnl / totalCostBasis) * 100 : 0;
+            return { totalCostBasis, totalCurrentValue, totalUnrealizedPnl, totalUnrealizedPnlPct };
+          })()
+        : null;
+
     return {
       watchlist: {
         id: watchlist.id,
         name: watchlist.name,
         isDefault: watchlist.isDefault,
-        items: items.map((item) => ({
-          id: item.id,
-          symbol: item.assetSymbol,
-          assetKind: item.assetKind,
-          createdAt: item.createdAt.toISOString(),
-          market: (() => {
-            const price = prices.get(item.assetSymbol);
-            if (!price) return null;
-            return {
-              priceUsd: price.price,
-              change24hPct: price.change24hPct,
-              asOf: price.asOf.toISOString(),
-            };
-          })(),
-        })),
+        portfolio,
+        items: enrichedItems,
       },
     };
   });
@@ -521,10 +569,44 @@ export function registerV1Routes(
           watchlistId: watchlist.id,
           assetSymbol: symbol,
           assetKind: input.assetKind,
+          quantity: input.quantity !== undefined ? input.quantity.toString() : undefined,
+          avgEntryPrice:
+            input.avgEntryPrice !== undefined ? input.avgEntryPrice.toString() : undefined,
+          entryDate: input.entryDate ?? undefined,
         })
         .onConflictDoNothing(),
     );
 
+    return { ok: true };
+  });
+
+  app.patch('/v1/watchlist/items/:symbol', async (req) => {
+    const claims = await requireAuth(req, verifier);
+    const user = await requireUserForPrivy(db, claims);
+    const params = z.object({ symbol: SymbolSchema }).parse(req.params);
+    const input = UpdateHoldingSchema.parse(req.body ?? {});
+
+    const updates: Record<string, unknown> = {};
+    if ('quantity' in input)
+      updates.quantity = input.quantity !== null ? input.quantity!.toString() : null;
+    if ('avgEntryPrice' in input)
+      updates.avgEntryPrice = input.avgEntryPrice !== null ? input.avgEntryPrice!.toString() : null;
+    if ('entryDate' in input) updates.entryDate = input.entryDate ?? null;
+
+    const [updated] = await withTenantUser(db, user.id, async (tx) =>
+      tx
+        .update(schema.watchlistItems)
+        .set(updates)
+        .where(
+          and(
+            eq(schema.watchlistItems.userId, user.id),
+            eq(schema.watchlistItems.assetSymbol, params.symbol.toUpperCase()),
+          ),
+        )
+        .returning({ id: schema.watchlistItems.id }),
+    );
+
+    if (!updated) throw Object.assign(new Error('watchlist item not found'), { statusCode: 404 });
     return { ok: true };
   });
 
