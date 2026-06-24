@@ -11,7 +11,12 @@ import { QueueNames } from './jobs.js';
  */
 export const INBOUND_PARTITION_COUNT = 8;
 
-/** Compute the partition index for a given conversation ID. */
+/**
+ * Map a conversation ID to an inbound partition index. Uses the first
+ * 4 bytes of SHA-256 as a uint32, then mods by partition count. Deterministic
+ * — the same conversation always lands on the same partition, giving
+ * per-conversation FIFO without BullMQ Pro.
+ */
 export function partitionFor(conversationId: string, partitions = INBOUND_PARTITION_COUNT): number {
   const hash = createHash('sha256').update(conversationId).digest();
   // First 4 bytes as unsigned int32 → mod partitions.
@@ -19,7 +24,10 @@ export function partitionFor(conversationId: string, partitions = INBOUND_PARTIT
   return n % partitions;
 }
 
-/** Resolve the inbound queue name a job should land on. */
+/**
+ * Resolve the inbound queue name a given conversation's job should be
+ * enqueued on. Called by the Edge service before publishing a job.
+ */
 export function inboundQueueFor(
   conversationId: string,
   partitions = INBOUND_PARTITION_COUNT,
@@ -27,7 +35,10 @@ export function inboundQueueFor(
   return `${QueueNames.inboundPrefix}-${partitionFor(conversationId, partitions)}`;
 }
 
-/** All inbound queue names a worker should consume from. */
+/** All inbound queue names the Worker should consume from. Draining old
+ * partitions when re-partitioning requires the old queues to be empty first
+ * (see the `INBOUND_PARTITION_COUNT` module doc).
+ */
 export function allInboundQueueNames(partitions = INBOUND_PARTITION_COUNT): string[] {
   return Array.from({ length: partitions }, (_, i) => `${QueueNames.inboundPrefix}-${i}`);
 }

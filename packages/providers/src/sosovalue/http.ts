@@ -51,6 +51,17 @@ export class SoSoValueHttp {
     this.fetchFn = opts.fetchFn ?? globalThis.fetch.bind(globalThis);
   }
 
+  /**
+   * Typed GET request against the SoSoValue REST API.
+   *
+   * 1. Builds URL with optional query params, sets auth header + timeout.
+   * 2. Maps HTTP status: 429 → RateLimitedError, 5xx → ProviderUnavailableError.
+   * 3. Unwraps the SoSoValue envelope `{ code, message, data }`.
+   * 4. Validates `data` against the supplied Zod schema.
+   *
+   * Throws typed ProviderError subtypes for all failure modes so the
+   * composed layer can decide retry vs. fallback vs. surface-to-user.
+   */
   async get<T>(
     path: string,
     schema: z.ZodType<T>,

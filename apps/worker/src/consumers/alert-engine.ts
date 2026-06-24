@@ -380,6 +380,7 @@ function alertKindAllowedByCoverage(
   }
 }
 
+/** Price threshold comparison. Returns true when the current price triggers the alert's operator. */
 function comparePrice(price: number, op: 'lt' | 'lte' | 'gt' | 'gte', threshold: number): boolean {
   switch (op) {
     case 'lt':
@@ -393,6 +394,11 @@ function comparePrice(price: number, op: 'lt' | 'lte' | 'gt' | 'gte', threshold:
   }
 }
 
+/**
+ * Human-readable outbound text for a price-crossing alert. Matches the
+ * direction prefix ("below" / "above") to the operator. Uses 4 decimal
+ * places for sub-dollar prices and 2 for everything else.
+ */
 function formatPriceMessage(
   symbol: string,
   op: 'lt' | 'lte' | 'gt' | 'gte',
@@ -403,6 +409,10 @@ function formatPriceMessage(
   return `${symbol} is now ${direction} $${threshold} — currently $${price.toFixed(price < 1 ? 4 : 2)}.`;
 }
 
+/**
+ * Human-readable outbound text for a news-match alert. Prefixes severity
+ * with emoji (🔴 high / 🟡 medium) for rich rendering in Telegram/Discord.
+ */
 function formatNewsMessage(
   symbol: string,
   article: typeof schema.newsExtractions.$inferSelect,
@@ -411,6 +421,11 @@ function formatNewsMessage(
   return `${tag} ${symbol}: ${article.summary}\n${article.title}${article.url ? `\n${article.url}` : ''}`;
 }
 
+/**
+ * Floor the date to the top of the current UTC hour. Used as a dedup-key
+ * suffix so price-cross alerts fire at most once per hour per symbol per
+ * cooldown window.
+ */
 function hourBucket(d: Date): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}`;
 }

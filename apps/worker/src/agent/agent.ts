@@ -51,6 +51,16 @@ export interface Agent {
   run: (input: RunAgentInput) => Promise<RunAgentResult>;
 }
 
+/**
+ * Creates a stateless Agent wrapping `ai.generateText` with:
+ * - Per-call tool construction (closures over `userId` prevent cross-tenant leaks).
+ * - Configurable max tool-use steps (default 4).
+ * - Fallback text when the model exhausts tool steps without producing prose.
+ * - Conversation-ID header propagation for tracing.
+ *
+ * The agent has no mutable state — all user context (watchlists, preferences)
+ * is accessed through tools that pull from the DB under RLS.
+ */
 export function createAgent(deps: AgentDeps): Agent {
   const { model } = createOpenRouterModel({
     apiKey: deps.openRouterApiKey,

@@ -1,5 +1,11 @@
 const DISCORD_API = 'https://discord.com/api/v10';
 
+/**
+ * Reply to a Discord interaction via followup webhook. Used for slash
+ * commands and modal interactions. Requires `applicationId` + `interactionToken`
+ * from the interaction payload. Returns `{ ok: false, description }` on
+ * Discord-side errors so the caller can decide whether to retry.
+ */
 export async function sendDiscordFollowupMessage(opts: {
   applicationId: string;
   interactionToken: string;
@@ -21,6 +27,11 @@ export async function sendDiscordFollowupMessage(opts: {
   return { ok: true };
 }
 
+/**
+ * Send a message to a Discord channel directly. Used for alert notifications
+ * and digest pushes, not in response to a user interaction. Requires a Bot
+ * token with proper permissions for the target channel.
+ */
 export async function sendDiscordChannelMessage(opts: {
   botToken: string;
   channelId: string;
@@ -42,6 +53,11 @@ export async function sendDiscordChannelMessage(opts: {
   return { ok: true };
 }
 
+/**
+ * Show the Discord typing indicator in a channel. The indicator auto-clears
+ * after ~10 seconds. Failures are swallowed — the indicator is cosmetic and
+ * must never block message delivery.
+ */
 export async function sendDiscordTyping(opts: {
   botToken: string;
   channelId: string;

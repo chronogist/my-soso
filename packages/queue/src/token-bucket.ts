@@ -81,6 +81,16 @@ export interface TokenBucket {
   take: (count?: number) => Promise<TokenBucketTakeResult>;
 }
 
+/**
+ * Creates a Redis-backed token-bucket rate limiter.
+ *
+ * The Lua script implements lazy refill — tokens are computed on every
+ * `take()` based on elapsed wall-clock time (no background cron needed).
+ * The bucket key auto-expires after being idle for one full refill cycle
+ * + 60s so abandoned keys do not accumulate in Redis.
+ *
+ * Used by `composeProvider` to enforce per-minute upstream API limits.
+ */
 export function createTokenBucket(redis: Redis, opts: TokenBucketOptions): TokenBucket {
   const keyPrefix = opts.keyPrefix ?? 'tokenbucket';
   const key = `${keyPrefix}:${opts.name}`;

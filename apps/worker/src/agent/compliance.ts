@@ -57,6 +57,14 @@ export interface ComplianceClassifier {
   review: (input: ComplianceReviewInput) => Promise<ComplianceReview>;
 }
 
+/**
+ * Creates a compliance classifier that runs an LLM classification on every
+ * assistant reply before it reaches the user. If the classification returns
+ * `recommendation` or `execution` the reply is replaced with the
+ * FALLBACK_RESPONSE to avoid giving regulated advice. On any LLM error the
+ * reply passes through unsanitised (fail-open) so a transient model outage
+ * does not block user-facing responses.
+ */
 export function createComplianceClassifier(deps: ComplianceDeps): ComplianceClassifier {
   const { model } = createOpenRouterModel({
     apiKey: deps.openRouterApiKey,
